@@ -1,0 +1,9 @@
+[package]
+name = "lang"
+version = "0.1.0"
+authors = ["Alex Angelini <alex.louis.angelini@gmail.com>"]
+
+[dependencies]
+clippy = "*"
+peg = "0.3.0"
+rustyline = "1.0.0"

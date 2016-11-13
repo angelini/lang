@@ -1,0 +1,61 @@
+use ast::{Expression, Value};
+
+#[pub]
+expression -> Expression
+  = call
+  / assign
+  / list
+  / fn
+  / string_expr
+  / int
+  / symbol
+
+call -> Expression
+  = i:identifier "(" __ e:comma_delim_exprs __ ")" { Expression::Call(i, e) }
+
+assign -> Expression
+  = i:identifier __ "=" __ e:expression { Expression::Assign(i, Box::new(e)) }
+
+list -> Expression
+  = "[" __ e:comma_delim_exprs __ "]" { Expression::List(e) }
+
+string_expr -> Expression
+  = "\"" s:string_with_whitespace "\"" { Expression::Value(Value::Str(s)) }
+
+int -> Expression
+  = d:digits { Expression::Value(Value::Int(d)) }
+
+fn -> Expression
+  = "fn" __ "(" __ a:comma_delim_idents __ ")" __ "{" __ e:semicolon_delim_exprs __ "}" {
+    Expression::Value(Value::Fn(Box::new((a, e))))
+  }
+
+symbol -> Expression
+  = i:identifier { Expression::Symbol(i) }
+
+semicolon_delim_exprs -> Vec<Expression>
+  = expression ++ semicolon_delim
+
+comma_delim_exprs -> Vec<Expression>
+  = expression ++ comma_delim
+
+comma_delim_idents -> Vec<String>
+  = identifier ++ comma_delim
+
+digits -> i64
+  = [0-9]+ { match_str.parse().unwrap() }
+
+identifier -> String
+  = [a-zA-Z] [a-zA-Z0-9_]* { match_str.to_owned() }
+
+string_with_whitespace -> String
+  = [a-zA-Z0-9_ ]+ { match_str.to_owned() }
+
+string -> String
+  = [a-zA-Z0-9_]+ { match_str.to_owned() }
+
+semicolon_delim = __ ";" __
+
+comma_delim = __ "," __
+
+__ = [ \n]*
