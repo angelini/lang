@@ -166,14 +166,65 @@ fn parse_and_eval(scope: &mut Scope, line: &str) {
 fn add(args: Vec<Value>) -> Value {
     match (&args[0], &args[1]) {
         (&Value::Int(l), &Value::Int(r)) => Value::Int(l + r),
-        _ => panic!("Incompatible types"),
+        _ => panic!("Invalid args to add: {:?}", args),
     }
 }
 
+macro_rules! equal_branches {
+    ( $e:expr, $( $x:path ),* ) => {{
+        assert!($e.len() == 2, "Invalid args to equal: {:?}", $e);
+        let mut args = $e;
+        let r = args.pop().unwrap();
+        let l = args.pop().unwrap();
+        match (l, r) {
+            $(
+                ($x(l), $x(r)) => Value::Bool(l == r),
+            )*
+            _ => panic!("Invalid args to equal: {:?}", args),
+        }
+    }};
+}
+
+fn equal(args: Vec<Value>) -> Value {
+    equal_branches!(args, Value::Bool, Value::Int, Value::Str, Value::Vec, Value::Fn, Value::PrimitiveFn)
+}
+
+macro_rules! if_branches {
+    ( $e:expr, $( $x:path ),* ) => {{
+        assert!($e.len() == 3, "Invalid args to if: {:?}", $e);
+        let mut args = $e;
+        let r = args.pop().unwrap();
+        let l = args.pop().unwrap();
+        let pred = args.pop().unwrap();
+        match (pred, l, r) {
+            $(
+                (Value::Bool(pred), $x(l), $x(r)) => {
+                    if pred {
+                        $x(l)
+                    } else {
+                        $x(r)
+                    }
+                }
+            )*
+            _ => panic!("Invalid args to if: {:?}", args),
+        }
+    }};
+}
+
+// NOTE: both while and if require un-evaluated expressions
+
+fn if_pfn(args: Vec<Value>) -> Value {
+    // FIXME: else branch is evaluated even if arg[0] is true
+    if_branches!(args, Value::Bool, Value::Int, Value::Str, Value::Vec)
+}
+
 fn lget(args: Vec<Value>) -> Value {
-    match (&args[0], &args[1]) {
-        (&Value::Vec(ref l), &Value::Int(i)) => l[i as usize].clone(),
-        _ => panic!("Incompatible types"),
+    let mut args = args;
+    let r = args.pop().unwrap();
+    let l = args.pop().unwrap();
+    match (l, r) {
+        (Value::Vec(ref mut l), Value::Int(i)) => l.remove(i as usize),
+        _ => panic!("Invalid args to lget: {:?}", args),
     }
 }
 
@@ -185,7 +236,9 @@ fn main() {
     let mut scope = Scope::new();
 
     scope.insert("add".to_string(), Value::PrimitiveFn(Box::new(add)));
+    scope.insert("equal".to_string(), Value::PrimitiveFn(Box::new(equal)));
     scope.insert("lget".to_string(), Value::PrimitiveFn(Box::new(lget)));
+    scope.insert("if".to_string(), Value::PrimitiveFn(Box::new(if_pfn)));
 
     parse_and_eval(&mut scope, "foo = 1");
     parse_and_eval(&mut scope, "bar = [1, 2, foo]");

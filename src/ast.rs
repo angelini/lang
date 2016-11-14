@@ -1,5 +1,6 @@
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
+    Bool(bool),
     Int(i64),
     Str(String),
     Vec(Vec<Value>),
@@ -7,7 +8,7 @@ pub enum Value {
     PrimitiveFn(Box<fn(Vec<Value>) -> Value>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
     Call(String, Vec<Expression>),
     Assign(String, Box<Expression>),

@@ -7,6 +7,7 @@ expression -> Expression
   / list
   / fn
   / string_expr
+  / bool
   / int
   / symbol
 
@@ -21,6 +22,10 @@ list -> Expression
 
 string_expr -> Expression
   = "\"" s:string_with_whitespace "\"" { Expression::Value(Value::Str(s)) }
+
+bool -> Expression
+  = "true" { Expression::Value(Value::Bool(true)) }
+  / "false" { Expression::Value(Value::Bool(false)) }
 
 int -> Expression
   = d:digits { Expression::Value(Value::Int(d)) }
