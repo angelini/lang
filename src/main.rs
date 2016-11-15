@@ -35,7 +35,7 @@ impl Scope {
         for level in self.levels.iter_mut().rev() {
             if level.contains_key(&key) {
                 level.insert(key, val);
-                return
+                return;
             }
         }
         let last = self.levels.len() - 1;
@@ -173,10 +173,7 @@ fn call_primitive_fn(scope: &mut Scope,
     }
 
     let args = args.into_iter()
-        .map(|expr| {
-            let result = eval(scope, expr);
-            get_or_clone(scope, result)
-        })
+        .map(|expr| eval_value(scope, expr))
         .collect::<Vec<Value>>();
     EvalResult::Val(func(args))
 }
@@ -218,7 +215,7 @@ fn eval(scope: &mut Scope, expr: Expression) -> EvalResult {
                         .collect();
                     call_fn(scope, args, block)
                 }
-                Value::PrimitiveFn(box func) => call_primitive_fn(scope, arg_exprs, func),
+                Value::PrimitiveFn(func) => call_primitive_fn(scope, arg_exprs, func),
                 _ => panic!("Tried to call a non-fn: {:?}", sym),
             }
         }
@@ -267,29 +264,47 @@ fn add(args: Vec<Value>) -> Value {
     }
 }
 
-macro_rules! equal_branches {
-    ( $e:expr, $( $x:path ),* ) => {{
-        assert!($e.len() == 2, "Invalid args to equal: {:?}", $e);
+macro_rules! cmp_branches {
+    ( $n:ident, $e:expr, $op:ident, $( $x:path ),* ) => {{
+        assert!($e.len() == 2, "Invalid args to $n: {:?}", $e);
         let mut args = $e;
         let r = args.pop().unwrap();
         let l = args.pop().unwrap();
         match (l, r) {
             $(
-                ($x(l), $x(r)) => Value::Bool(l == r),
+                ($x(l), $x(r)) => Value::Bool(l.$op(&r)),
             )*
-            _ => panic!("Invalid args to equal: {:?}", args),
+            _ => panic!("Invalid args to $n: {:?}", args),
         }
     }};
 }
 
-fn equal(args: Vec<Value>) -> Value {
-    equal_branches!(args,
-                    Value::Bool,
-                    Value::Int,
-                    Value::Str,
-                    Value::Vec,
-                    Value::Fn,
-                    Value::PrimitiveFn)
+fn eq_pfn(args: Vec<Value>) -> Value {
+    cmp_branches!(equal,
+                  args,
+                  eq,
+                  Value::Bool,
+                  Value::Int,
+                  Value::Str,
+                  Value::Vec,
+                  Value::Fn,
+                  Value::PrimitiveFn)
+}
+
+fn gt_pfn(args: Vec<Value>) -> Value {
+    cmp_branches!(greater_than, args, gt, Value::Int, Value::Str, Value::Vec)
+}
+
+fn ge_pfn(args: Vec<Value>) -> Value {
+    cmp_branches!(greater_equal, args, ge, Value::Int, Value::Str, Value::Vec)
+}
+
+fn lt_pfn(args: Vec<Value>) -> Value {
+    cmp_branches!(less_than, args, lt, Value::Int, Value::Str, Value::Vec)
+}
+
+fn le_pfn(args: Vec<Value>) -> Value {
+    cmp_branches!(less_equal, args, le, Value::Int, Value::Str, Value::Vec)
 }
 
 fn lget(args: Vec<Value>) -> Value {
@@ -314,15 +329,19 @@ fn main() {
 
     let mut scope = Scope::new();
 
-    scope.insert("add".to_string(), Value::PrimitiveFn(Box::new(add)));
-    scope.insert("equal".to_string(), Value::PrimitiveFn(Box::new(equal)));
+    scope.insert("add".to_string(), Value::PrimitiveFn(add));
     scope.insert("if".to_string(),
-                 Value::PrimitiveFn(Box::new(if_pfn_marker)));
-    scope.insert("lget".to_string(), Value::PrimitiveFn(Box::new(lget)));
-    scope.insert("print".to_string(), Value::PrimitiveFn(Box::new(print_pfn)));
+                 Value::PrimitiveFn(if_pfn_marker));
+    scope.insert("lget".to_string(), Value::PrimitiveFn(lget));
+    scope.insert("print".to_string(), Value::PrimitiveFn(print_pfn));
     scope.insert("while".to_string(),
-                 Value::PrimitiveFn(Box::new(while_pfn_marker)));
+                 Value::PrimitiveFn(while_pfn_marker));
 
+    scope.insert("eq".to_string(), Value::PrimitiveFn(eq_pfn));
+    scope.insert("gt".to_string(), Value::PrimitiveFn(gt_pfn));
+    scope.insert("ge".to_string(), Value::PrimitiveFn(ge_pfn));
+    scope.insert("lt".to_string(), Value::PrimitiveFn(lt_pfn));
+    scope.insert("le".to_string(), Value::PrimitiveFn(le_pfn));
 
     parse_and_eval(&mut scope, "foo = 1", true);
     parse_and_eval(&mut scope, "bar = [1, 2, foo]", true);
