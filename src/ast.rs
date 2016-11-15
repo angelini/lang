@@ -1,5 +1,6 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
+    Nil,
     Bool(bool),
     Int(i64),
     Str(String),
@@ -10,9 +11,10 @@ pub enum Value {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
-    Call(String, Vec<Expression>),
     Assign(String, Box<Expression>),
+    Block(Vec<Expression>),
+    Call(String, Vec<Expression>),
     List(Vec<Expression>),
-    Value(Value),
     Symbol(String),
+    Value(Value),
 }

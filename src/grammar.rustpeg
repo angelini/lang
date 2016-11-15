@@ -6,6 +6,7 @@ expression -> Expression
   / assign
   / list
   / fn
+  / block
   / string_expr
   / bool
   / int
@@ -34,6 +35,9 @@ fn -> Expression
   = "fn" __ "(" __ a:comma_delim_idents __ ")" __ "{" __ e:semicolon_delim_exprs __ "}" {
     Expression::Value(Value::Fn(Box::new((a, e))))
   }
+
+block -> Expression
+  = "{" __ e:semicolon_delim_exprs __ "}" { Expression::Block(e) }
 
 symbol -> Expression
   = i:identifier { Expression::Symbol(i) }
