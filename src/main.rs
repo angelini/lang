@@ -1,65 +1,19 @@
-#![feature(box_patterns, plugin)]
+#![feature(advanced_slice_patterns, box_patterns, plugin, slice_patterns)]
 #![plugin(peg_syntax_ext)]
 
 extern crate rustyline;
 
 mod ast;
+mod primitives;
+mod scope;
 
 use ast::{Expression, Value};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-use std::collections::HashMap;
+use scope::Scope;
 use std::mem;
 
 peg_file! grammar("grammar.rustpeg");
-
-#[derive(Clone, Debug)]
-pub struct Scope {
-    levels: Vec<HashMap<String, Value>>,
-}
-
-impl Scope {
-    fn new() -> Scope {
-        Scope { levels: vec![HashMap::new()] }
-    }
-
-    fn descend(&mut self) {
-        self.levels.push(HashMap::new())
-    }
-
-    fn ascend(&mut self) {
-        self.levels.pop();
-    }
-
-    fn insert(&mut self, key: String, val: Value) {
-        for level in self.levels.iter_mut().rev() {
-            if level.contains_key(&key) {
-                level.insert(key, val);
-                return;
-            }
-        }
-        let last = self.levels.len() - 1;
-        self.levels.get_mut(last).unwrap().insert(key, val);
-    }
-
-    fn get(&self, key: &str) -> Option<&Value> {
-        for level in self.levels.iter().rev() {
-            if level.contains_key(key) {
-                return level.get(key);
-            }
-        }
-        None
-    }
-
-    fn contains_key(&self, key: &str) -> bool {
-        for level in self.levels.iter().rev() {
-            if level.contains_key(key) {
-                return true;
-            }
-        }
-        false
-    }
-}
 
 #[derive(Debug)]
 enum EvalResult {
@@ -119,13 +73,8 @@ fn if_pfn(scope: &mut Scope, args: Vec<Expression>) -> EvalResult {
     }
 }
 
-fn if_pfn_marker(_: Vec<Value>) -> Value {
-    unreachable!()
-}
-
-fn while_pfn(scope: &mut Scope, args: Vec<Expression>) -> EvalResult {
+fn while_pfn(scope: &mut Scope, mut args: Vec<Expression>) -> EvalResult {
     assert!(args.len() == 2, "Invalid args to while: {:?}", args);
-    let mut args = args;
     let exprs = match args.pop().unwrap() {
         Expression::Block(exprs) => exprs,
         _ => panic!("Invalid block to while"),
@@ -155,20 +104,16 @@ fn while_pfn(scope: &mut Scope, args: Vec<Expression>) -> EvalResult {
     result
 }
 
-fn while_pfn_marker(_: Vec<Value>) -> Value {
-    unreachable!()
-}
-
 fn call_primitive_fn(scope: &mut Scope,
                      args: Vec<Expression>,
                      func: fn(Vec<Value>) -> Value)
                      -> EvalResult {
 
-    if func == if_pfn_marker {
+    if func == primitives::if_pfn_marker {
         return if_pfn(scope, args);
     }
 
-    if func == while_pfn_marker {
+    if func == primitives::while_pfn_marker {
         return while_pfn(scope, args);
     }
 
@@ -257,70 +202,6 @@ fn parse_and_eval(scope: &mut Scope, line: &str, show_line: bool) {
     println!("---")
 }
 
-fn add(args: Vec<Value>) -> Value {
-    match (&args[0], &args[1]) {
-        (&Value::Int(l), &Value::Int(r)) => Value::Int(l + r),
-        _ => panic!("Invalid args to add: {:?}", args),
-    }
-}
-
-macro_rules! cmp_branches {
-    ( $n:ident, $e:expr, $op:ident, $( $x:path ),* ) => {{
-        assert!($e.len() == 2, "Invalid args to $n: {:?}", $e);
-        let mut args = $e;
-        let r = args.pop().unwrap();
-        let l = args.pop().unwrap();
-        match (l, r) {
-            $(
-                ($x(l), $x(r)) => Value::Bool(l.$op(&r)),
-            )*
-            _ => panic!("Invalid args to $n: {:?}", args),
-        }
-    }};
-}
-
-fn eq_pfn(args: Vec<Value>) -> Value {
-    cmp_branches!(equal,
-                  args,
-                  eq,
-                  Value::Bool,
-                  Value::Int,
-                  Value::Str,
-                  Value::Vec,
-                  Value::Fn,
-                  Value::PrimitiveFn)
-}
-
-fn gt_pfn(args: Vec<Value>) -> Value {
-    cmp_branches!(greater_than, args, gt, Value::Int, Value::Str, Value::Vec)
-}
-
-fn ge_pfn(args: Vec<Value>) -> Value {
-    cmp_branches!(greater_equal, args, ge, Value::Int, Value::Str, Value::Vec)
-}
-
-fn lt_pfn(args: Vec<Value>) -> Value {
-    cmp_branches!(less_than, args, lt, Value::Int, Value::Str, Value::Vec)
-}
-
-fn le_pfn(args: Vec<Value>) -> Value {
-    cmp_branches!(less_equal, args, le, Value::Int, Value::Str, Value::Vec)
-}
-
-fn lget(args: Vec<Value>) -> Value {
-    let mut args = args;
-    let r = args.pop().unwrap();
-    let l = args.pop().unwrap();
-    match (l, r) {
-        (Value::Vec(ref mut l), Value::Int(i)) => l.remove(i as usize),
-        _ => panic!("Invalid args to lget: {:?}", args),
-    }
-}
-
-fn print_pfn(args: Vec<Value>) -> Value {
-    println!("stdout >> {:?}", args);
-    Value::Nil
-}
 
 fn main() {
     println!("mem::size_of::<Value>(): {:?}", mem::size_of::<Value>());
@@ -328,20 +209,7 @@ fn main() {
              mem::size_of::<Expression>());
 
     let mut scope = Scope::new();
-
-    scope.insert("add".to_string(), Value::PrimitiveFn(add));
-    scope.insert("if".to_string(),
-                 Value::PrimitiveFn(if_pfn_marker));
-    scope.insert("lget".to_string(), Value::PrimitiveFn(lget));
-    scope.insert("print".to_string(), Value::PrimitiveFn(print_pfn));
-    scope.insert("while".to_string(),
-                 Value::PrimitiveFn(while_pfn_marker));
-
-    scope.insert("eq".to_string(), Value::PrimitiveFn(eq_pfn));
-    scope.insert("gt".to_string(), Value::PrimitiveFn(gt_pfn));
-    scope.insert("ge".to_string(), Value::PrimitiveFn(ge_pfn));
-    scope.insert("lt".to_string(), Value::PrimitiveFn(lt_pfn));
-    scope.insert("le".to_string(), Value::PrimitiveFn(le_pfn));
+    primitives::add_primitive_fns(&mut scope);
 
     parse_and_eval(&mut scope, "foo = 1", true);
     parse_and_eval(&mut scope, "bar = [1, 2, foo]", true);
