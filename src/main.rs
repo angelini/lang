@@ -11,7 +11,10 @@ use ast::{Expression, Value};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use scope::Scope;
+use std::env;
+use std::fs::File;
 use std::mem;
+use std::io::prelude::*;
 
 peg_file! grammar("grammar.rustpeg");
 
@@ -202,21 +205,31 @@ fn parse_and_eval(scope: &mut Scope, line: &str, show_line: bool) {
     println!("---")
 }
 
+fn eval_file(scope: &mut Scope, file: &str) -> Result<(), std::io::Error> {
+    let mut f = try!(File::open(file));
+    let mut contents = String::new();
+    try!(f.read_to_string(&mut contents));
 
-fn main() {
-    println!("mem::size_of::<Value>(): {:?}", mem::size_of::<Value>());
-    println!("mem::size_of::<Expression>(): {:?}",
-             mem::size_of::<Expression>());
+    match grammar::expressions(&contents.trim()) {
+        Ok(exprs) => {
+            for expr in exprs {
+                eval(scope, expr);
+            }
+        }
+        Err(err) => panic!("parse error: {:?}", err),
+    }
+    Ok(())
+}
 
-    let mut scope = Scope::new();
-    primitives::add_primitive_fns(&mut scope);
+const HISTORY_FILE: &'static str = "history.txt";
 
+fn start_repl(mut scope: &mut Scope) {
     parse_and_eval(&mut scope, "foo = 1", true);
     parse_and_eval(&mut scope, "bar = [1, 2, foo]", true);
     parse_and_eval(&mut scope, "identity = fn (id) { id }", true);
 
     let mut rl = Editor::<()>::new();
-    if let Err(_) = rl.load_history("history.txt") {
+    if let Err(_) = rl.load_history(HISTORY_FILE) {
         println!("No previous history");
     }
 
@@ -241,5 +254,22 @@ fn main() {
             }
         }
     }
-    rl.save_history("history.txt").unwrap();
+    rl.save_history(HISTORY_FILE).unwrap();
+}
+
+fn main() {
+    println!("mem::size_of::<Value>(): {:?}", mem::size_of::<Value>());
+    println!("mem::size_of::<Expression>(): {:?}",
+             mem::size_of::<Expression>());
+
+    let args = env::args().collect::<Vec<String>>();
+
+    let mut scope = Scope::new();
+    primitives::add_primitive_fns(&mut scope);
+
+    match args[1..] {
+        [ref file] => eval_file(&mut scope, file).unwrap(),
+        _ => start_repl(&mut scope)
+    }
+
 }

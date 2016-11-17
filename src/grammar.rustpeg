@@ -1,11 +1,15 @@
 use ast::{Expression, Value};
 
 #[pub]
+expressions -> Vec<Expression>
+  = ws_delim_exprs
+
+#[pub]
 expression -> Expression
-  = call
+  = fn
+  / call
   / assign
   / list
-  / fn
   / block
   / string_expr
   / bool
@@ -22,7 +26,7 @@ list -> Expression
   = "[" __ e:comma_delim_exprs __ "]" { Expression::List(e) }
 
 string_expr -> Expression
-  = "\"" s:string_with_whitespace "\"" { Expression::Value(Value::Str(s)) }
+  = "\"" s:string_with_ws "\"" { Expression::Value(Value::Str(s)) }
 
 bool -> Expression
   = "true" { Expression::Value(Value::Bool(true)) }
@@ -32,24 +36,24 @@ int -> Expression
   = d:digits { Expression::Value(Value::Int(d)) }
 
 fn -> Expression
-  = "fn" __ "(" __ a:comma_delim_idents __ ")" __ "{" __ e:semicolon_delim_exprs __ "}" {
+  = "fn" __ "(" __ a:comma_delim_idents __ ")" __ "{" __ e:ws_delim_exprs __ "}" {
     Expression::Value(Value::Fn(Box::new((a, e))))
   }
 
 block -> Expression
-  = "{" __ e:semicolon_delim_exprs __ "}" { Expression::Block(e) }
+  = "{" __ e:ws_delim_exprs __ "}" { Expression::Block(e) }
 
 symbol -> Expression
   = i:identifier { Expression::Symbol(i) }
 
-semicolon_delim_exprs -> Vec<Expression>
-  = expression ++ semicolon_delim
+ws_delim_exprs -> Vec<Expression>
+  = expression ++ __
 
 comma_delim_exprs -> Vec<Expression>
-  = expression ++ comma_delim
+  = expression ** comma_delim
 
 comma_delim_idents -> Vec<String>
-  = identifier ++ comma_delim
+  = identifier ** comma_delim
 
 digits -> i64
   = [0-9]+ { match_str.parse().unwrap() }
@@ -57,14 +61,17 @@ digits -> i64
 identifier -> String
   = [a-zA-Z] [a-zA-Z0-9_]* { match_str.to_owned() }
 
-string_with_whitespace -> String
+comma_delim = __ "," __
+
+__ = [ \n]* comment* [ \n]*
+
+comment = "#" comment_string_with_ws "\n"
+
+comment_string_with_ws -> String
+  = [a-zA-Z0-9\-><_ =(){}",]+ { match_str.to_owned() }
+
+string_with_ws -> String
   = [a-zA-Z0-9_ ]+ { match_str.to_owned() }
 
 string -> String
   = [a-zA-Z0-9_]+ { match_str.to_owned() }
-
-semicolon_delim = __ ";" __
-
-comma_delim = __ "," __
-
-__ = [ \n]*

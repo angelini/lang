@@ -1,0 +1,56 @@
+foo = 1
+bar = 2
+
+list = if(eq(foo, bar), {
+    print("true", foo)
+    [1, 2]
+}, {
+    print("false", bar)
+    [3, 4]
+})
+
+print("list", list)
+
+index = 0
+
+while(lt(index, 10), { # comment
+    print(index)
+    index = add(index, 1)
+})
+
+print("final i", index)
+
+add_two = fn(x) {
+    add(x, 2)
+}
+
+# other
+
+print("add_two", add_two(4))
+
+const = 4
+
+outer = fn (x, y) {
+    inner = fn (a, b) {
+        add(add(a, b), const)
+    }
+    add(x, inner(y, 5))
+}
+
+print("outer", outer(10, 20))
+
+const = 5
+
+print("outer", outer(10, 20))
+
+# lambda = fn () {
+#     closed = 4
+#     fn () {
+#        closed
+#    }
+# }
+# lambda_inner = lambda()
+# print("closed", lambda_inner())
+# error -> closed undefined
+
+1
