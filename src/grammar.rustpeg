@@ -37,7 +37,7 @@ int -> Expression
 
 fn -> Expression
   = "fn" __ "(" __ a:comma_delim_idents __ ")" __ "{" __ e:ws_delim_exprs __ "}" {
-    Expression::Value(Value::Fn(Box::new((a, e))))
+    Expression::Value(Value::RawFn(Box::new((a, e))))
   }
 
 block -> Expression

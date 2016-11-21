@@ -6,4 +6,5 @@ authors = ["Alex Angelini <alex.louis.angelini@gmail.com>"]
 [dependencies]
 clippy = "*"
 peg = "0.3.0"
+rand = "0.3"
 rustyline = "1.0.0"

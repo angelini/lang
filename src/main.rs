@@ -1,6 +1,7 @@
 #![feature(advanced_slice_patterns, box_patterns, plugin, slice_patterns)]
 #![plugin(peg_syntax_ext)]
 
+extern crate rand;
 extern crate rustyline;
 
 mod ast;
@@ -8,6 +9,7 @@ mod primitives;
 mod scope;
 
 use ast::{Expression, Value};
+use rand::Rng;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use scope::Scope;
@@ -32,6 +34,7 @@ fn get_or_clone(scope: &Scope, res: EvalResult) -> Value {
 }
 
 fn call_fn(scope: &mut Scope,
+           fn_key: &str,
            args: Vec<(&String, Expression)>,
            block: &[Expression])
            -> EvalResult {
@@ -42,8 +45,7 @@ fn call_fn(scope: &mut Scope,
         })
         .collect::<Vec<(&String, Value)>>();
 
-    scope.descend();
-
+    let scope_id = scope.descend_from(fn_key);
     for (name, arg) in args {
         scope.insert(name.to_string(), arg);
     }
@@ -51,13 +53,16 @@ fn call_fn(scope: &mut Scope,
     let last = block.len() - 1;
     for (i, expr) in block.into_iter().enumerate() {
         if i == last {
-            let result = eval(scope, expr.clone());
+            let result = eval_value(scope, expr.clone());
             scope.ascend();
-            return result;
+            scope.jump_to(scope_id);
+            return EvalResult::Val(result);
         } else {
             eval(scope, expr.clone());
         }
     }
+    scope.ascend();
+    scope.jump_to(scope_id);
     EvalResult::Val(Value::Nil)
 }
 
@@ -111,7 +116,6 @@ fn call_primitive_fn(scope: &mut Scope,
                      args: Vec<Expression>,
                      func: fn(Vec<Value>) -> Value)
                      -> EvalResult {
-
     if func == primitives::if_pfn_marker {
         return if_pfn(scope, args);
     }
@@ -146,6 +150,7 @@ fn eval(scope: &mut Scope, expr: Expression) -> EvalResult {
                     eval(scope, expr.clone());
                 }
             }
+            scope.ascend();
             EvalResult::Val(Value::Nil)
         }
         Expression::Call(sym, arg_exprs) => {
@@ -155,13 +160,13 @@ fn eval(scope: &mut Scope, expr: Expression) -> EvalResult {
             };
 
             match fn_val {
-                Value::Fn(box (ref arg_names, ref block)) => {
+                Value::Fn(box (ref fn_key, ref arg_names, ref block)) => {
                     assert!(arg_names.len() == arg_exprs.len(),
                             "Wrong number of args supplied");
                     let args = arg_names.iter()
                         .zip(arg_exprs.into_iter())
                         .collect();
-                    call_fn(scope, args, block)
+                    call_fn(scope, fn_key, args, block)
                 }
                 Value::PrimitiveFn(func) => call_primitive_fn(scope, arg_exprs, func),
                 _ => panic!("Tried to call a non-fn: {:?}", sym),
@@ -182,7 +187,16 @@ fn eval(scope: &mut Scope, expr: Expression) -> EvalResult {
                 panic!("Undefined symbol: {:?}", sym)
             }
         }
-        Expression::Value(val) => EvalResult::Val(val),
+        Expression::Value(val) => {
+            let val = match val {
+                Value::RawFn(box (ref args, ref exprs)) => {
+                    let num = rand::thread_rng().gen_range(10000, 99999);
+                    Value::Fn(Box::new((format!("fn_{}", num), args.clone(), exprs.clone())))
+                }
+                v => v,
+            };
+            EvalResult::Val(val)
+        }
     }
 }
 
@@ -269,7 +283,7 @@ fn main() {
 
     match args[1..] {
         [ref file] => eval_file(&mut scope, file).unwrap(),
-        _ => start_repl(&mut scope)
+        _ => start_repl(&mut scope),
     }
 
 }

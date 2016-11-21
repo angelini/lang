@@ -5,7 +5,8 @@ pub enum Value {
     Int(i64),
     Str(String),
     Vec(Vec<Value>),
-    Fn(Box<(Vec<String>, Vec<Expression>)>),
+    Fn(Box<(String, Vec<String>, Vec<Expression>)>),
+    RawFn(Box<(Vec<String>, Vec<Expression>)>),
     PrimitiveFn(fn(Vec<Value>) -> Value),
 }
 
