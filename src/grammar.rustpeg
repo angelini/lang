@@ -2,7 +2,7 @@ use ast::{Expression, Value};
 
 #[pub]
 expressions -> Vec<Expression>
-  = ws_delim_exprs
+  = comment? __ ws_delim_exprs
 
 #[pub]
 expression -> Expression
@@ -68,7 +68,7 @@ __ = [ \n]* comment* [ \n]*
 comment = "#" comment_string_with_ws "\n"
 
 comment_string_with_ws -> String
-  = [a-zA-Z0-9\-><_ =(){}",]+ { match_str.to_owned() }
+  = [a-zA-Z0-9\-><_ =(){}",:'\/]+ { match_str.to_owned() }
 
 string_with_ws -> String
   = [a-zA-Z0-9_ ]+ { match_str.to_owned() }
