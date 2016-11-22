@@ -17,33 +17,18 @@ use std::env;
 use std::fs::File;
 use std::mem;
 use std::io::prelude::*;
+use std::rc::Rc;
 
 peg_file! grammar("grammar.rustpeg");
-
-#[derive(Debug)]
-enum EvalResult {
-    Val(Value),
-    Key(String),
-}
-
-fn get_or_clone(scope: &Scope, res: EvalResult) -> Value {
-    match res {
-        EvalResult::Val(v) => v,
-        EvalResult::Key(k) => scope.get(&k).unwrap().clone(),
-    }
-}
 
 fn call_fn(scope: &mut Scope,
            fn_key: &str,
            args: Vec<(&String, Expression)>,
            block: &[Expression])
-           -> EvalResult {
+           -> Rc<Value> {
     let args = args.into_iter()
-        .map(|(name, expr)| {
-            let result = eval(scope, expr);
-            (name, get_or_clone(scope, result))
-        })
-        .collect::<Vec<(&String, Value)>>();
+        .map(|(name, expr)| (name, eval(scope, expr)))
+        .collect::<Vec<(&String, Rc<Value>)>>();
 
     let scope_id = scope.descend_from(fn_key);
     for (name, arg) in args {
@@ -53,35 +38,35 @@ fn call_fn(scope: &mut Scope,
     let last = block.len() - 1;
     for (i, expr) in block.into_iter().enumerate() {
         if i == last {
-            let result = eval_value(scope, expr.clone());
+            let result = eval(scope, expr.clone());
             scope.ascend();
             scope.jump_to(scope_id);
-            return EvalResult::Val(result);
+            return result;
         } else {
             eval(scope, expr.clone());
         }
     }
     scope.ascend();
     scope.jump_to(scope_id);
-    EvalResult::Val(Value::Nil)
+    Rc::new(Value::Nil)
 }
 
-fn if_pfn(scope: &mut Scope, args: Vec<Expression>) -> EvalResult {
+fn if_pfn(scope: &mut Scope, args: Vec<Expression>) -> Rc<Value> {
     assert!(args.len() == 3, "Invalid args to if: {:?}", args);
     let mut args = args;
     let r = args.pop().unwrap();
     let l = args.pop().unwrap();
 
     let pred_expr = args.pop().unwrap();
-    let pred = eval_value(scope, pred_expr);
+    let pred = eval(scope, pred_expr);
 
-    match pred {
+    match *pred {
         Value::Bool(pred) => if pred { eval(scope, l) } else { eval(scope, r) },
         _ => panic!("Invalid predicate to if"),
     }
 }
 
-fn while_pfn(scope: &mut Scope, mut args: Vec<Expression>) -> EvalResult {
+fn while_pfn(scope: &mut Scope, mut args: Vec<Expression>) -> Rc<Value> {
     assert!(args.len() == 2, "Invalid args to while: {:?}", args);
     let exprs = match args.pop().unwrap() {
         Expression::Block(exprs) => exprs,
@@ -89,12 +74,12 @@ fn while_pfn(scope: &mut Scope, mut args: Vec<Expression>) -> EvalResult {
     };
 
     let pred = args.pop().unwrap();
-    let mut pred_bool = match eval_value(scope, pred.clone()) {
+    let mut pred_bool = match *eval(scope, pred.clone()) {
         Value::Bool(b) => b,
         _ => panic!("Invalid predicate to while"),
     };
 
-    let mut result = EvalResult::Val(Value::Nil);
+    let mut result = Rc::new(Value::Nil);
 
     while pred_bool {
         scope.descend();
@@ -103,7 +88,7 @@ fn while_pfn(scope: &mut Scope, mut args: Vec<Expression>) -> EvalResult {
         }
         scope.ascend();
 
-        pred_bool = match eval_value(scope, pred.clone()) {
+        pred_bool = match *eval(scope, pred.clone()) {
             Value::Bool(b) => b,
             _ => panic!("Invalid predicate to while"),
         };
@@ -114,8 +99,8 @@ fn while_pfn(scope: &mut Scope, mut args: Vec<Expression>) -> EvalResult {
 
 fn call_primitive_fn(scope: &mut Scope,
                      args: Vec<Expression>,
-                     func: fn(Vec<Value>) -> Value)
-                     -> EvalResult {
+                     func: fn(Vec<Rc<Value>>) -> Value)
+                     -> Rc<Value> {
     if func == primitives::if_pfn_marker {
         return if_pfn(scope, args);
     }
@@ -125,18 +110,17 @@ fn call_primitive_fn(scope: &mut Scope,
     }
 
     let args = args.into_iter()
-        .map(|expr| eval_value(scope, expr))
-        .collect::<Vec<Value>>();
-    EvalResult::Val(func(args))
+        .map(|expr| eval(scope, expr))
+        .collect::<Vec<Rc<Value>>>();
+    Rc::new(func(args))
 }
 
-fn eval(scope: &mut Scope, expr: Expression) -> EvalResult {
+fn eval(scope: &mut Scope, expr: Expression) -> Rc<Value> {
     match expr {
         Expression::Assign(sym, e) => {
             let result = eval(scope, *e);
-            let val = get_or_clone(scope, result);
-            scope.insert(sym.clone(), val);
-            EvalResult::Key(sym)
+            scope.insert(sym.clone(), result.clone());
+            result
         }
         Expression::Block(exprs) => {
             scope.descend();
@@ -151,7 +135,7 @@ fn eval(scope: &mut Scope, expr: Expression) -> EvalResult {
                 }
             }
             scope.ascend();
-            EvalResult::Val(Value::Nil)
+            Rc::new(Value::Nil)
         }
         Expression::Call(sym, arg_exprs) => {
             let fn_val = match scope.get(&sym) {
@@ -159,7 +143,7 @@ fn eval(scope: &mut Scope, expr: Expression) -> EvalResult {
                 None => panic!("Undefined symbol: {:?}", sym),
             };
 
-            match fn_val {
+            match *fn_val {
                 Value::Fn(box (ref fn_key, ref arg_names, ref block)) => {
                     assert!(arg_names.len() == arg_exprs.len(),
                             "Wrong number of args supplied");
@@ -172,17 +156,20 @@ fn eval(scope: &mut Scope, expr: Expression) -> EvalResult {
                 _ => panic!("Tried to call a non-fn: {:?}", sym),
             }
         }
-        Expression::List(items) => {
-            let mut val = Vec::new();
-            for item in items.into_iter() {
-                let result = eval(scope, item);
-                val.push(get_or_clone(scope, result))
+        Expression::List(exprs) => {
+            let mut list = Vec::new();
+            for expr in exprs.into_iter() {
+                let val = match Rc::try_unwrap(eval(scope, expr)) {
+                    Ok(v) => v,
+                    Err(rc) => rc.as_ref().clone(),
+                };
+                list.push(val)
             }
-            EvalResult::Val(Value::Vec(val))
+            Rc::new(Value::Vec(list))
         }
         Expression::Symbol(sym) => {
             if scope.contains_key(&sym) {
-                EvalResult::Key(sym)
+                scope.get(&sym).unwrap().clone()
             } else {
                 panic!("Undefined symbol: {:?}", sym)
             }
@@ -195,14 +182,9 @@ fn eval(scope: &mut Scope, expr: Expression) -> EvalResult {
                 }
                 v => v,
             };
-            EvalResult::Val(val)
+            Rc::new(val)
         }
     }
-}
-
-fn eval_value(scope: &mut Scope, expr: Expression) -> Value {
-    let result = eval(scope, expr);
-    get_or_clone(scope, result)
 }
 
 fn parse_and_eval(scope: &mut Scope, line: &str, show_line: bool) {
@@ -211,7 +193,7 @@ fn parse_and_eval(scope: &mut Scope, line: &str, show_line: bool) {
     }
     match grammar::expression(&line) {
         Ok(e) => {
-            println!("ret: {:?}", eval_value(scope, e));
+            println!("ret: {:?}", eval(scope, e));
             println!("scp: {:?}", scope);
         }
         Err(err) => println!("parse error: {:?}", err),
@@ -285,5 +267,4 @@ fn main() {
         [ref file] => eval_file(&mut scope, file).unwrap(),
         _ => start_repl(&mut scope),
     }
-
 }

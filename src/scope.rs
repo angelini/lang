@@ -1,10 +1,11 @@
 use ast::Value;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 #[derive(Debug)]
 struct Node {
     id: usize,
-    env: HashMap<String, Value>,
+    env: HashMap<String, Rc<Value>>,
     deps: HashSet<String>,
     parent: Option<usize>,
 }
@@ -62,7 +63,7 @@ impl Scope {
         {
             let node = self.nodes.get(&self.curr_id).unwrap();
             for val in node.env.values() {
-                if let &Value::Fn(box (ref fn_key, _, _)) = val {
+                if let Value::Fn(box (ref fn_key, _, _)) = **val {
                     to_remove.push((fn_key.clone(), self.lineage(node.parent)))
                 }
             }
@@ -99,8 +100,8 @@ impl Scope {
         self.curr_id = id;
     }
 
-    pub fn insert(&mut self, key: String, val: Value) {
-        if let Value::Fn(box (ref id, _, _)) = val {
+    pub fn insert(&mut self, key: String, val: Rc<Value>) {
+        if let Value::Fn(box (ref id, _, _)) = *val {
             self.tag_self_and_parents(&id);
         };
 
@@ -116,12 +117,12 @@ impl Scope {
         self.nodes.get_mut(&self.curr_id).unwrap().env.insert(key, val);
     }
 
-    pub fn get(&self, key: &str) -> Option<&Value> {
+    pub fn get(&self, key: &str) -> Option<Rc<Value>> {
         let mut id_opt = Some(self.curr_id);
         while let Some(id) = id_opt {
             let node = self.nodes.get(&id).unwrap();
             if node.env.contains_key(key) {
-                return node.env.get(key);
+                return Some(node.env.get(key).unwrap().clone());
             }
             id_opt = node.parent;
         }

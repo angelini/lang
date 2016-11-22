@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Value {
     Nil,
@@ -7,7 +9,7 @@ pub enum Value {
     Vec(Vec<Value>),
     Fn(Box<(String, Vec<String>, Vec<Expression>)>),
     RawFn(Box<(Vec<String>, Vec<Expression>)>),
-    PrimitiveFn(fn(Vec<Value>) -> Value),
+    PrimitiveFn(fn(Vec<Rc<Value>>) -> Value),
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
