@@ -54,7 +54,7 @@ fn le_pfn(args: Vec<Rc<Value>>) -> Value {
     cmp_branches!(less_equal, args, le, Value::Int, Value::Str, Value::Vec)
 }
 
-fn lget(args: Vec<Rc<Value>>) -> Value {
+fn get(args: Vec<Rc<Value>>) -> Value {
     match args_to_ref!(args)[..] {
         [&Value::Vec(ref l), &Value::Int(i)] => {
             match l.get(i as usize) {
@@ -62,12 +62,18 @@ fn lget(args: Vec<Rc<Value>>) -> Value {
                 None => Value::Nil,
             }
         }
-        [ref a..] => panic!("Invalid args to lget: {:?}", a),
+        [&Value::Map(ref m), v] => {
+            match m.get(v) {
+                Some(v) => v.as_ref().clone(),
+                None => Value::Nil,
+            }
+        }
+        [ref a..] => panic!("Invalid args to get: {:?}", a),
     }
 }
 
-fn lpush(mut args: Vec<Rc<Value>>) -> Value {
-    assert!(args.len() == 2, "Invalid args to lpush: {:?}", args);
+fn push(mut args: Vec<Rc<Value>>) -> Value {
+    assert!(args.len() == 2, "Invalid args to push: {:?}", args);
     let val = args.pop().unwrap();
     let list = match Rc::try_unwrap(args.pop().unwrap()) {
         Ok(l) => l,
@@ -79,7 +85,25 @@ fn lpush(mut args: Vec<Rc<Value>>) -> Value {
             l.push(v);
             Value::Vec(l)
         }
-        (l, v) => panic!("Invalid args to lpush: {:?} {:?}", l, v),
+        (l, v) => panic!("Invalid args to push: {:?} {:?}", l, v),
+    }
+}
+
+fn insert(mut args: Vec<Rc<Value>>) -> Value {
+    assert!(args.len() == 3, "Invalid args to insert: {:?}", args);
+    let val = args.pop().unwrap();
+    let key = args.pop().unwrap();
+    let map = match Rc::try_unwrap(args.pop().unwrap()) {
+        Ok(m) => m,
+        Err(rc) => rc.as_ref().clone(),
+    };
+
+    match (map, key, val) {
+        (Value::Map(mut m), k, v) => {
+            m.insert(k, v);
+            Value::Map(m)
+        }
+        (m, k, v) => panic!("Invalid args to insert: {:?} {:?} {:?}", m, k, v),
     }
 }
 
@@ -105,8 +129,9 @@ pub fn add_primitive_fns(scope: &mut Scope) {
     add_to_scope(scope, "while", while_pfn_marker);
 
     add_to_scope(scope, "add", add);
-    add_to_scope(scope, "lget", lget);
-    add_to_scope(scope, "lpush", lpush);
+    add_to_scope(scope, "get", get);
+    add_to_scope(scope, "insert", insert);
+    add_to_scope(scope, "push", push);
     add_to_scope(scope, "print", print_pfn);
 
     add_to_scope(scope, "eq", eq_pfn);

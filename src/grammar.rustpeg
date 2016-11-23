@@ -10,6 +10,7 @@ expression -> Expression
   / call
   / assign
   / list
+  / map
   / block
   / string_expr
   / bool
@@ -24,6 +25,9 @@ assign -> Expression
 
 list -> Expression
   = "[" __ e:comma_delim_exprs __ "]" { Expression::List(e) }
+
+map -> Expression
+  = "{" __ e:comma_delim_expr_pairs __ "}" { Expression::Map(e) }
 
 string_expr -> Expression
   = "\"" s:string_with_ws "\"" { Expression::Value(Value::Str(s)) }
@@ -45,6 +49,12 @@ block -> Expression
 
 symbol -> Expression
   = i:identifier { Expression::Symbol(i) }
+
+comma_delim_expr_pairs -> Vec<(Expression, Expression)>
+  = expr_pair ++ comma_delim
+
+expr_pair -> (Expression, Expression)
+  = l:expression __ ":" __ r:expression { (l, r) }
 
 ws_delim_exprs -> Vec<Expression>
   = expression ++ __

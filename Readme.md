@@ -23,6 +23,7 @@ str = "string"
 int = 1
 bool = true
 list = [1, 2, 3]
+map = { "a": 1, "b": 2 }
 func = fn (x) { x }
 
 # If / While
@@ -37,6 +38,14 @@ while(lt(a, 3), {
   print("a", a)
   a = add(a, 1)
 })
+
+# Immutable data structures
+
+eq(get(map, "a"), 1)
+
+new_map = insert(map, "c", 3)
+
+eq(get(new_map, "c"), 3)
 
 # First class functions
 

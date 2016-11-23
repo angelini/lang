@@ -13,6 +13,7 @@ use rand::Rng;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use scope::Scope;
+use std::collections::BTreeMap;
 use std::env;
 use std::fs::File;
 use std::mem;
@@ -162,6 +163,13 @@ fn eval(scope: &mut Scope, expr: Expression) -> Rc<Value> {
                 list.push(eval(scope, expr))
             }
             Rc::new(Value::Vec(list))
+        }
+        Expression::Map(pairs) => {
+            let mut map = BTreeMap::new();
+            for (l, r) in pairs.into_iter() {
+                map.insert(eval(scope, l), eval(scope, r));
+            }
+            Rc::new(Value::Map(map))
         }
         Expression::Symbol(sym) => {
             if scope.contains_key(&sym) {
