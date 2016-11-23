@@ -58,7 +58,7 @@ fn lget(args: Vec<Rc<Value>>) -> Value {
     match args_to_ref!(args)[..] {
         [&Value::Vec(ref l), &Value::Int(i)] => {
             match l.get(i as usize) {
-                Some(v) => v.clone(),
+                Some(v) => v.as_ref().clone(),
                 None => Value::Nil,
             }
         }
@@ -76,7 +76,7 @@ fn lpush(mut args: Vec<Rc<Value>>) -> Value {
 
     match (list, val) {
         (Value::Vec(mut l), v) => {
-            l.push(v.as_ref().clone());
+            l.push(v);
             Value::Vec(l)
         }
         (l, v) => panic!("Invalid args to lpush: {:?} {:?}", l, v),

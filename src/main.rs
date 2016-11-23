@@ -159,11 +159,7 @@ fn eval(scope: &mut Scope, expr: Expression) -> Rc<Value> {
         Expression::List(exprs) => {
             let mut list = Vec::new();
             for expr in exprs.into_iter() {
-                let val = match Rc::try_unwrap(eval(scope, expr)) {
-                    Ok(v) => v,
-                    Err(rc) => rc.as_ref().clone(),
-                };
-                list.push(val)
+                list.push(eval(scope, expr))
             }
             Rc::new(Value::Vec(list))
         }
