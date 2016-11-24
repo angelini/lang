@@ -54,3 +54,25 @@ lambda_inner = lambda()
 print("closed", lambda_inner())
 
 1
+
+for = fn (coll, func) {
+    i = 0
+    ks = keys(coll)
+    size = len(ks)
+
+    while(lt(i, size), {
+        key = get(ks, i)
+        func(key, get(coll, key))
+        i = add(i, 1)
+    })
+}
+
+for([5, 6, 7, 8], fn (i, v) {
+    print("i", i)
+    print("v", v)
+})
+
+for({"a": 1, "b": 2}, fn (k, v) {
+    print("k", k)
+    print("v", v)
+})

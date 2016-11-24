@@ -72,6 +72,26 @@ fn get(args: Vec<Rc<Value>>) -> Value {
     }
 }
 
+fn len(args: Vec<Rc<Value>>) -> Value {
+    match args_to_ref!(args)[..] {
+        [&Value::Vec(ref l)] => Value::Int(l.len() as i64),
+        [&Value::Map(ref m)] => Value::Int(m.len() as i64),
+        [ref a..] => panic!("Invalid args to len: {:?}", a),
+    }
+}
+
+fn keys(args: Vec<Rc<Value>>) -> Value {
+    match args_to_ref!(args)[..] {
+        [&Value::Vec(ref l)] => {
+            Value::Vec((0..l.len())
+                .map(|i| Rc::new(Value::Int(i as i64)))
+                .collect::<Vec<Rc<Value>>>())
+        }
+        [&Value::Map(ref m)] => Value::Vec(m.keys().map(|k| k.clone()).collect::<Vec<Rc<Value>>>()),
+        [ref a..] => panic!("Invalid args to len: {:?}", a),
+    }
+}
+
 fn push(mut args: Vec<Rc<Value>>) -> Value {
     assert!(args.len() == 2, "Invalid args to push: {:?}", args);
     let val = args.pop().unwrap();
@@ -131,6 +151,8 @@ pub fn add_primitive_fns(scope: &mut Scope) {
     add_to_scope(scope, "add", add);
     add_to_scope(scope, "get", get);
     add_to_scope(scope, "insert", insert);
+    add_to_scope(scope, "keys", keys);
+    add_to_scope(scope, "len", len);
     add_to_scope(scope, "push", push);
     add_to_scope(scope, "print", print_pfn);
 

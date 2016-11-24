@@ -58,4 +58,28 @@ add_3 = add_n(3)
 
 print(add_2(1))
 print(add_3(1))
+
+# For loop implementation
+
+for = fn (coll, func) {
+    i = 0
+    ks = keys(coll)
+    size = len(ks)
+
+    while(lt(i, size), {
+        key = get(ks, i)
+        func(key, get(coll, key))
+        i = add(i, 1)
+    })
+}
+
+for([5, 6, 7, 8], fn (i, v) {
+    print("i", i)
+    print("v", v)
+})
+
+for({"a": 1, "b": 2}, fn (k, v) {
+    print("k", k)
+    print("v", v)
+})
 ```
