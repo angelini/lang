@@ -45,10 +45,9 @@ print("outer", outer(10, 20))
 
 lambda = fn () {
     closed = 4
-    foo = fn () {
+    fn () {
         closed
     }
-    foo
 }
 
 lambda_inner = lambda()

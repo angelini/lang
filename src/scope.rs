@@ -101,10 +101,6 @@ impl Scope {
     }
 
     pub fn insert(&mut self, key: String, val: Rc<Value>) {
-        if let Value::Fn(box (ref id, _, _)) = *val {
-            self.tag_self_and_parents(&id);
-        };
-
         let mut id_opt = Some(self.curr_id);
         while let Some(id) = id_opt {
             let node = self.nodes.get_mut(&id).unwrap();
@@ -141,7 +137,7 @@ impl Scope {
         false
     }
 
-    fn tag_self_and_parents(&mut self, fn_key: &str) {
+    pub fn tag_self_and_parents(&mut self, fn_key: &str) {
         let mut id_opt = Some(self.curr_id);
         while let Some(id) = id_opt {
             let node = self.nodes.get_mut(&id).unwrap();

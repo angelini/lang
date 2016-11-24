@@ -50,8 +50,7 @@ eq(get(new_map, "c"), 3)
 # First class functions
 
 add_n = fn (n) {
-  ret = fn (x) { add(x, n) }  # FIXME: assigment shouldn't be necessary
-  ret
+  fn (x) { add(x, n) }
 }
 
 add_2 = add_n(2)

@@ -182,7 +182,9 @@ fn eval(scope: &mut Scope, expr: Expression) -> Rc<Value> {
             let val = match val {
                 Value::RawFn(box (ref args, ref exprs)) => {
                     let num = rand::thread_rng().gen_range(10000, 99999);
-                    Value::Fn(Box::new((format!("fn_{}", num), args.clone(), exprs.clone())))
+                    let fn_key = format!("fn_{}", num);
+                    scope.tag_self_and_parents(&fn_key);
+                    Value::Fn(Box::new((fn_key, args.clone(), exprs.clone())))
                 }
                 v => v,
             };
