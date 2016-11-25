@@ -24,3 +24,14 @@ pub enum Expression {
     Symbol(String),
     Value(Value),
 }
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub enum Type {
+    Nil,
+    Bool,
+    Int,
+    Str,
+    Vec(Box<Type>),
+    Map(Box<(Type, Type)>),
+    Fn(Box<(Vec<Type>, Type)>)
+}

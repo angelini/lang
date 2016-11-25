@@ -1,5 +1,5 @@
 use ast::Value;
-use scope::Scope;
+use scope::ValueScope;
 use std::rc::Rc;
 
 macro_rules! args_to_ref {
@@ -132,7 +132,7 @@ fn print_pfn(args: Vec<Rc<Value>>) -> Value {
     Value::Nil
 }
 
-fn add_to_scope(scope: &mut Scope, key: &str, primitive: fn(Vec<Rc<Value>>) -> Value) {
+fn add_to_scope(scope: &mut ValueScope, key: &str, primitive: fn(Vec<Rc<Value>>) -> Value) {
     scope.insert(key.to_string(), Rc::new(Value::PrimitiveFn(primitive)))
 }
 
@@ -144,7 +144,7 @@ pub fn while_pfn_marker(_: Vec<Rc<Value>>) -> Value {
     unreachable!()
 }
 
-pub fn add_primitive_fns(scope: &mut Scope) {
+pub fn add_primitive_fns(scope: &mut ValueScope) {
     add_to_scope(scope, "if", if_pfn_marker);
     add_to_scope(scope, "while", while_pfn_marker);
 

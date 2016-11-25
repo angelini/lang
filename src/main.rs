@@ -8,11 +8,11 @@ mod ast;
 mod primitives;
 mod scope;
 
-use ast::{Expression, Value};
+use ast::{Expression, Type, Value};
 use rand::Rng;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-use scope::Scope;
+use scope::{TypeScope, ValueScope};
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::File;
@@ -22,7 +22,7 @@ use std::rc::Rc;
 
 peg_file! grammar("grammar.rustpeg");
 
-fn call_fn(scope: &mut Scope,
+fn call_fn(scope: &mut ValueScope,
            fn_key: &str,
            args: Vec<(&String, Expression)>,
            block: &[Expression])
@@ -52,7 +52,7 @@ fn call_fn(scope: &mut Scope,
     Rc::new(Value::Nil)
 }
 
-fn if_pfn(scope: &mut Scope, args: Vec<Expression>) -> Rc<Value> {
+fn if_pfn(scope: &mut ValueScope, args: Vec<Expression>) -> Rc<Value> {
     assert!(args.len() == 3, "Invalid args to if: {:?}", args);
     let mut args = args;
     let r = args.pop().unwrap();
@@ -67,7 +67,7 @@ fn if_pfn(scope: &mut Scope, args: Vec<Expression>) -> Rc<Value> {
     }
 }
 
-fn while_pfn(scope: &mut Scope, mut args: Vec<Expression>) -> Rc<Value> {
+fn while_pfn(scope: &mut ValueScope, mut args: Vec<Expression>) -> Rc<Value> {
     assert!(args.len() == 2, "Invalid args to while: {:?}", args);
     let exprs = match args.pop().unwrap() {
         Expression::Block(exprs) => exprs,
@@ -98,7 +98,7 @@ fn while_pfn(scope: &mut Scope, mut args: Vec<Expression>) -> Rc<Value> {
     result
 }
 
-fn call_primitive_fn(scope: &mut Scope,
+fn call_primitive_fn(scope: &mut ValueScope,
                      args: Vec<Expression>,
                      func: fn(Vec<Rc<Value>>) -> Value)
                      -> Rc<Value> {
@@ -116,7 +116,7 @@ fn call_primitive_fn(scope: &mut Scope,
     Rc::new(func(args))
 }
 
-fn eval(scope: &mut Scope, expr: Expression) -> Rc<Value> {
+fn eval(scope: &mut ValueScope, expr: Expression) -> Rc<Value> {
     match expr {
         Expression::Assign(sym, e) => {
             let result = eval(scope, *e);
@@ -193,21 +193,187 @@ fn eval(scope: &mut Scope, expr: Expression) -> Rc<Value> {
     }
 }
 
-fn parse_and_eval(scope: &mut Scope, line: &str, show_line: bool) {
+fn type_of_val(val: &Value) -> Type {
+    match *val {
+        Value::Nil => Type::Nil,
+        Value::Bool(_) => Type::Bool,
+        Value::Int(_) => Type::Int,
+        Value::Str(_) => Type::Str,
+        Value::Vec(ref values) => {
+            if values.is_empty() {
+                return Type::Nil;
+            }
+
+            let mut typ = None;
+
+            for val in values.iter() {
+                typ = match typ {
+                    Some(typ) => {
+                        let result = type_of_val(val);
+                        if result != typ {
+                            panic!("Type error, expected: {:?} got: {:?}", typ, result)
+                        }
+                        Some(typ)
+                    }
+                    None => Some(type_of_val(val))
+                }
+            }
+
+            match typ {
+                Some(typ) => typ,
+                None => Type::Nil,
+            }
+        }
+        Value::Map(ref pairs) => {
+            if pairs.is_empty() {
+                return Type::Nil;
+            }
+
+            let mut key_typ = None;
+            let mut val_typ = None;
+
+            for (key, val) in pairs.iter() {
+                key_typ = match key_typ {
+                    Some(typ) => {
+                        let result = type_of_val(key);
+                        if result != typ {
+                            panic!("Type error, expected: {:?} got: {:?}", typ, result)
+                        }
+                        Some(typ)
+                    }
+                    None => Some(type_of_val(val))
+                };
+                val_typ = match val_typ {
+                    Some(typ) => {
+                        let result = type_of_val(val);
+                        if result != typ {
+                            panic!("Type error, expected: {:?} got: {:?}", typ, result)
+                        }
+                        Some(typ)
+                    }
+                    None => Some(type_of_val(val))
+                }
+
+            }
+
+            match (key_typ, val_typ) {
+                (None, None) => Type::Map(Box::new((Type::Nil, Type::Nil))),
+                (Some(k), Some(v)) => Type::Map(Box::new((k, v))),
+                _ => unreachable!(),
+            }
+        }
+        Value::Fn(_) => Type::Nil, // FIXME: define fn types
+        Value::RawFn(_) => Type::Nil,
+        Value::PrimitiveFn(_) => Type::Nil,
+    }
+}
+
+fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
+    match expr {
+        Expression::Assign(sym, e) => {
+            let result = type_check(scope, *e);
+            scope.insert(sym.clone(), result.clone());
+            result
+        }
+        Expression::Block(exprs) => {
+            scope.descend();
+            let last = exprs.len() - 1;
+            for (i, expr) in exprs.into_iter().enumerate() {
+                if i == last {
+                    let result = type_check(scope, expr.clone());
+                    scope.ascend();
+                    return result;
+                } else {
+                    type_check(scope, expr.clone());
+                }
+            }
+            scope.ascend();
+            Type::Nil
+        }
+        Expression::Call(sym, arg_exprs) => {
+            let fn_type = match scope.get(&sym) {
+                Some(typ) => typ,
+                None => panic!("Undefined symbol: {:?}", sym),
+            };
+
+            match fn_type {
+                Type::Fn(box (ref arg_types, ref ret_type)) => {
+                    for (expr, typ) in arg_exprs.into_iter().zip(arg_types.into_iter()) {
+                        let result = type_check(scope, expr);
+                        if &result != typ {
+                            panic!("Type error, expected: {:?} got: {:?}", typ, result)
+                        }
+                    }
+                    ret_type.clone()
+                }
+                _ => panic!("Tried to call a non-fn: {:?}", sym),
+            }
+        }
+        Expression::List(mut exprs) => {
+            if exprs.is_empty() {
+                return Type::Nil;
+            }
+
+            let first = exprs.pop().unwrap();
+            let typ = type_check(scope, first);
+
+            for expr in exprs.into_iter() {
+                let result = type_check(scope, expr);
+                if result != typ {
+                    panic!("Type error, expected: {:?} got: {:?}", typ, result)
+                }
+            }
+            Type::Vec(Box::new(typ))
+        }
+        Expression::Map(mut pairs) => {
+            if pairs.is_empty() {
+                return Type::Nil;
+            }
+
+            let (key, val) = pairs.pop().unwrap();
+            let (key_typ, val_typ) = (type_check(scope, key), type_check(scope, val));
+
+            for (key, val) in pairs.into_iter() {
+                let actual_key_typ = type_check(scope, key);
+                if actual_key_typ != key_typ {
+                    panic!("Type error, expected: {:?} got: {:?}", key_typ, actual_key_typ)
+                }
+                let actual_val_typ = type_check(scope, val);
+                if actual_val_typ != val_typ {
+                    panic!("Type error, expected: {:?} got: {:?}", key_typ, actual_val_typ)
+                }
+            }
+            Type::Map(Box::new((key_typ, val_typ)))
+        }
+        Expression::Symbol(sym) => {
+            if scope.contains_key(&sym) {
+                scope.get(&sym).unwrap()
+            } else {
+                panic!("Undefined symbol: {:?}", sym)
+            }
+        }
+        Expression::Value(val) => {
+            type_of_val(&val)
+        }
+    }
+}
+
+fn parse_and_eval(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope, line: &str, show_line: bool) {
     if show_line {
         println!("lin: {:?}", line);
     }
     match grammar::expression(&line) {
         Ok(e) => {
-            println!("ret: {:?}", eval(scope, e));
-            println!("scp: {:?}", scope);
+            println!("typ: {:?}", type_check(tscope, e.clone()));
+            println!("ret: {:?}", eval(vscope, e));
+            println!("scp: {:?}", vscope);
         }
         Err(err) => println!("parse error: {:?}", err),
     }
     println!("---")
 }
 
-fn eval_file(scope: &mut Scope, file: &str) -> Result<(), std::io::Error> {
+fn eval_file(tscope: &mut TypeScope, vscope: &mut ValueScope, file: &str) -> Result<(), std::io::Error> {
     let mut f = try!(File::open(file));
     let mut contents = String::new();
     try!(f.read_to_string(&mut contents));
@@ -215,7 +381,7 @@ fn eval_file(scope: &mut Scope, file: &str) -> Result<(), std::io::Error> {
     match grammar::expressions(&contents.trim()) {
         Ok(exprs) => {
             for expr in exprs {
-                eval(scope, expr);
+                eval(vscope, expr);
             }
         }
         Err(err) => panic!("parse error: {:?}", err),
@@ -225,10 +391,10 @@ fn eval_file(scope: &mut Scope, file: &str) -> Result<(), std::io::Error> {
 
 const HISTORY_FILE: &'static str = "history.txt";
 
-fn start_repl(mut scope: &mut Scope) {
-    parse_and_eval(&mut scope, "foo = 1", true);
-    parse_and_eval(&mut scope, "bar = [1, 2, foo]", true);
-    parse_and_eval(&mut scope, "identity = fn (id) { id }", true);
+fn start_repl(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope) {
+    parse_and_eval(&mut tscope, &mut vscope, "foo = 1", true);
+    parse_and_eval(&mut tscope, &mut vscope, "bar = [1, 2, foo]", true);
+    parse_and_eval(&mut tscope, &mut vscope, "identity = fn (id) { id }", true);
 
     let mut rl = Editor::<()>::new();
     if let Err(_) = rl.load_history(HISTORY_FILE) {
@@ -240,7 +406,7 @@ fn start_repl(mut scope: &mut Scope) {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(&line);
-                parse_and_eval(&mut scope, &line, false);
+                parse_and_eval(&mut tscope, &mut vscope, &line, false);
             }
             Err(ReadlineError::Interrupted) => {
                 println!("ctrl-c");
@@ -266,11 +432,12 @@ fn main() {
 
     let args = env::args().collect::<Vec<String>>();
 
-    let mut scope = Scope::new();
-    primitives::add_primitive_fns(&mut scope);
+    let mut tscope = TypeScope::new();
+    let mut vscope = ValueScope::new();
+    primitives::add_primitive_fns(&mut vscope);
 
     match args[1..] {
-        [ref file] => eval_file(&mut scope, file).unwrap(),
-        _ => start_repl(&mut scope),
+        [ref file] => eval_file(&mut tscope, &mut vscope, file).unwrap(),
+        _ => start_repl(&mut tscope, &mut vscope),
     }
 }
