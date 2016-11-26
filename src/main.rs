@@ -24,12 +24,12 @@ peg_file! grammar("grammar.rustpeg");
 
 fn call_fn(scope: &mut ValueScope,
            fn_key: &str,
-           args: Vec<(&String, Expression)>,
+           args: Vec<(&str, Expression)>,
            block: &[Expression])
            -> Rc<Value> {
     let args = args.into_iter()
         .map(|(name, expr)| (name, eval(scope, expr)))
-        .collect::<Vec<(&String, Rc<Value>)>>();
+        .collect::<Vec<(&str, Rc<Value>)>>();
 
     let scope_id = scope.descend_from(fn_key);
     for (name, arg) in args {
@@ -37,7 +37,7 @@ fn call_fn(scope: &mut ValueScope,
     }
 
     let last = block.len() - 1;
-    for (i, expr) in block.into_iter().enumerate() {
+    for (i, expr) in block.iter().enumerate() {
         if i == last {
             let result = eval(scope, expr.clone());
             scope.ascend();
@@ -149,6 +149,7 @@ fn eval(scope: &mut ValueScope, expr: Expression) -> Rc<Value> {
                     assert!(arg_names.len() == arg_exprs.len(),
                             "Wrong number of args supplied");
                     let args = arg_names.iter()
+                        .map(|t| t.0.as_str())
                         .zip(arg_exprs.into_iter())
                         .collect();
                     call_fn(scope, fn_key, args, block)
@@ -188,7 +189,30 @@ fn eval(scope: &mut ValueScope, expr: Expression) -> Rc<Value> {
     }
 }
 
-fn type_of_val(val: &Value) -> Type {
+fn fn_type(scope: &mut TypeScope, args: &[(String, Type)], exprs: &[Expression]) -> (Vec<Type>, Type) {
+    let mut arg_types = vec![];
+    scope.descend();
+
+    for &(ref name, ref typ) in args {
+        scope.insert(name.clone(), typ.clone());
+        arg_types.push(typ.clone());
+    }
+
+    let last = exprs.len() - 1;
+    for (i, expr) in exprs.into_iter().enumerate() {
+        if i == last {
+            let result = type_check(scope, expr.clone());
+            scope.ascend();
+            return (arg_types, result)
+        } else {
+            type_check(scope, expr.clone());
+        }
+    }
+    scope.ascend();
+    (arg_types, Type::Nil)
+}
+
+fn value_to_type(scope: &mut TypeScope, val: &Value) -> Type {
     match *val {
         Value::Nil => Type::Nil,
         Value::Bool(_) => Type::Bool,
@@ -204,13 +228,13 @@ fn type_of_val(val: &Value) -> Type {
             for val in values.iter() {
                 typ = match typ {
                     Some(typ) => {
-                        let result = type_of_val(val);
+                        let result = value_to_type(scope, val);
                         if result != typ {
                             panic!("Type error, expected: {:?} got: {:?}", typ, result)
                         }
                         Some(typ)
                     }
-                    None => Some(type_of_val(val)),
+                    None => Some(value_to_type(scope, val)),
                 }
             }
 
@@ -230,23 +254,23 @@ fn type_of_val(val: &Value) -> Type {
             for (key, val) in pairs.iter() {
                 key_typ = match key_typ {
                     Some(typ) => {
-                        let result = type_of_val(key);
+                        let result = value_to_type(scope, key);
                         if result != typ {
                             panic!("Type error, expected: {:?} got: {:?}", typ, result)
                         }
                         Some(typ)
                     }
-                    None => Some(type_of_val(val)),
+                    None => Some(value_to_type(scope, val)),
                 };
                 val_typ = match val_typ {
                     Some(typ) => {
-                        let result = type_of_val(val);
+                        let result = value_to_type(scope, val);
                         if result != typ {
                             panic!("Type error, expected: {:?} got: {:?}", typ, result)
                         }
                         Some(typ)
                     }
-                    None => Some(type_of_val(val)),
+                    None => Some(value_to_type(scope, val)),
                 }
 
             }
@@ -257,7 +281,9 @@ fn type_of_val(val: &Value) -> Type {
                 _ => unreachable!(),
             }
         }
-        Value::Fn(_) => Type::Nil, // FIXME: define fn types
+        Value::Fn(box (_, ref args, ref exprs)) => {
+            Type::Fn(Box::new(fn_type(scope, args, exprs)))
+        }
         Value::PrimitiveFn(_) => Type::Nil,
     }
 }
@@ -308,8 +334,8 @@ fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
                 return Type::Nil;
             }
 
-            let first = exprs.pop().unwrap();
-            let typ = type_check(scope, first);
+            let last = exprs.pop().unwrap();
+            let typ = type_check(scope, last);
 
             for expr in exprs.into_iter() {
                 let result = type_check(scope, expr);
@@ -343,7 +369,9 @@ fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
             }
             Type::Map(Box::new((key_typ, val_typ)))
         }
-        Expression::Fn(_, _) => Type::Nil, // FIXME
+        Expression::Fn(ref args, ref exprs) => {
+            Type::Fn(Box::new(fn_type(scope, args, exprs)))
+        }
         Expression::Symbol(sym) => {
             if scope.contains_key(&sym) {
                 scope.get(&sym).unwrap()
@@ -351,7 +379,7 @@ fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
                 panic!("Undefined symbol: {:?}", sym)
             }
         }
-        Expression::Value(val) => type_of_val(&val),
+        Expression::Value(val) => value_to_type(scope, &val),
     }
 }
 
@@ -397,7 +425,7 @@ const HISTORY_FILE: &'static str = "history.txt";
 fn start_repl(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope) {
     parse_and_eval(&mut tscope, &mut vscope, "foo = 1", true);
     parse_and_eval(&mut tscope, &mut vscope, "bar = [1, 2, foo]", true);
-    parse_and_eval(&mut tscope, &mut vscope, "identity = fn (id) { id }", true);
+    parse_and_eval(&mut tscope, &mut vscope, "identity = fn (id: int) { id }", true);
 
     let mut rl = Editor::<()>::new();
     if let Err(_) = rl.load_history(HISTORY_FILE) {

@@ -1,4 +1,4 @@
-use ast::{Expression, Value};
+use ast::{Expression, Type, Value};
 
 #[pub]
 expressions -> Vec<Expression>
@@ -40,7 +40,7 @@ int -> Expression
   = d:digits { Expression::Value(Value::Int(d)) }
 
 fn -> Expression
-  = "fn" __ "(" __ a:comma_delim_idents __ ")" __ "{" __ e:ws_delim_exprs __ "}" {
+  = "fn" __ "(" __ a:comma_delim_typed_idents __ ")" __ "{" __ e:ws_delim_exprs __ "}" {
     Expression::Fn(a, e)
   }
 
@@ -62,8 +62,40 @@ ws_delim_exprs -> Vec<Expression>
 comma_delim_exprs -> Vec<Expression>
   = expression ** comma_delim
 
-comma_delim_idents -> Vec<String>
-  = identifier ** comma_delim
+comma_delim_typed_idents -> Vec<(String, Type)>
+  = typed_ident ** comma_delim
+
+typed_ident -> (String, Type)
+  = i:identifier __ ":" __ t:type { (i, t) }
+
+type -> Type
+  = bool_type
+  / int_type
+  / str_type
+  / vec_type
+  / map_type
+  / fn_type
+
+bool_type -> Type
+  = "bool" { Type::Bool }
+
+int_type -> Type
+  = "int" { Type::Int }
+
+str_type -> Type
+  = "str" { Type::Str }
+
+vec_type -> Type
+  = "vec[" __ t:type __ "]" { Type::Vec(Box::new(t)) }
+
+map_type -> Type
+  = "map[" __ k:type __ "," __ v:type "]" { Type::Map(Box::new((k, v))) }
+
+fn_type -> Type
+  = "(" __ a:comma_delim_types __ ")" __ "->" __ o:type { Type::Fn(Box::new((a, o))) }
+
+comma_delim_types -> Vec<Type>
+  = type ** comma_delim
 
 digits -> i64
   = [0-9]+ { match_str.parse().unwrap() }

@@ -1,6 +1,17 @@
 use std::rc::Rc;
 use std::collections::BTreeMap;
 
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Type {
+    Nil,
+    Bool,
+    Int,
+    Str,
+    Vec(Box<Type>),
+    Map(Box<(Type, Type)>),
+    Fn(Box<(Vec<Type>, Type)>),
+}
+
 #[derive(Clone, Eq, Debug, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Value {
     Nil,
@@ -9,7 +20,7 @@ pub enum Value {
     Str(String),
     Vec(Vec<Rc<Value>>),
     Map(BTreeMap<Rc<Value>, Rc<Value>>),
-    Fn(Box<(String, Vec<String>, Vec<Expression>)>),
+    Fn(Box<(String, Vec<(String, Type)>, Vec<Expression>)>),
     PrimitiveFn(fn(Vec<Rc<Value>>) -> Value),
 }
 
@@ -20,18 +31,7 @@ pub enum Expression {
     Call(String, Vec<Expression>),
     List(Vec<Expression>),
     Map(Vec<(Expression, Expression)>),
-    Fn(Vec<String>, Vec<Expression>),
+    Fn(Vec<(String, Type)>, Vec<Expression>),
     Symbol(String),
     Value(Value),
-}
-
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub enum Type {
-    Nil,
-    Bool,
-    Int,
-    Str,
-    Vec(Box<Type>),
-    Map(Box<(Type, Type)>),
-    Fn(Box<(Vec<Type>, Type)>),
 }
