@@ -171,6 +171,12 @@ fn eval(scope: &mut ValueScope, expr: Expression) -> Rc<Value> {
             }
             Rc::new(Value::Map(map))
         }
+        Expression::Fn(args, exprs) => {
+            let num = rand::thread_rng().gen_range(10000, 99999);
+            let fn_key = format!("fn_{}", num);
+            scope.tag_self_and_parents(&fn_key);
+            Rc::new(Value::Fn(Box::new((fn_key, args, exprs))))
+        }
         Expression::Symbol(sym) => {
             if scope.contains_key(&sym) {
                 scope.get(&sym).unwrap().clone()
@@ -178,18 +184,7 @@ fn eval(scope: &mut ValueScope, expr: Expression) -> Rc<Value> {
                 panic!("Undefined symbol: {:?}", sym)
             }
         }
-        Expression::Value(val) => {
-            let val = match val {
-                Value::RawFn(box (ref args, ref exprs)) => {
-                    let num = rand::thread_rng().gen_range(10000, 99999);
-                    let fn_key = format!("fn_{}", num);
-                    scope.tag_self_and_parents(&fn_key);
-                    Value::Fn(Box::new((fn_key, args.clone(), exprs.clone())))
-                }
-                v => v,
-            };
-            Rc::new(val)
-        }
+        Expression::Value(val) => Rc::new(val),
     }
 }
 
@@ -215,7 +210,7 @@ fn type_of_val(val: &Value) -> Type {
                         }
                         Some(typ)
                     }
-                    None => Some(type_of_val(val))
+                    None => Some(type_of_val(val)),
                 }
             }
 
@@ -241,7 +236,7 @@ fn type_of_val(val: &Value) -> Type {
                         }
                         Some(typ)
                     }
-                    None => Some(type_of_val(val))
+                    None => Some(type_of_val(val)),
                 };
                 val_typ = match val_typ {
                     Some(typ) => {
@@ -251,7 +246,7 @@ fn type_of_val(val: &Value) -> Type {
                         }
                         Some(typ)
                     }
-                    None => Some(type_of_val(val))
+                    None => Some(type_of_val(val)),
                 }
 
             }
@@ -263,7 +258,6 @@ fn type_of_val(val: &Value) -> Type {
             }
         }
         Value::Fn(_) => Type::Nil, // FIXME: define fn types
-        Value::RawFn(_) => Type::Nil,
         Value::PrimitiveFn(_) => Type::Nil,
     }
 }
@@ -336,15 +330,20 @@ fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
             for (key, val) in pairs.into_iter() {
                 let actual_key_typ = type_check(scope, key);
                 if actual_key_typ != key_typ {
-                    panic!("Type error, expected: {:?} got: {:?}", key_typ, actual_key_typ)
+                    panic!("Type error, expected: {:?} got: {:?}",
+                           key_typ,
+                           actual_key_typ)
                 }
                 let actual_val_typ = type_check(scope, val);
                 if actual_val_typ != val_typ {
-                    panic!("Type error, expected: {:?} got: {:?}", key_typ, actual_val_typ)
+                    panic!("Type error, expected: {:?} got: {:?}",
+                           key_typ,
+                           actual_val_typ)
                 }
             }
             Type::Map(Box::new((key_typ, val_typ)))
         }
+        Expression::Fn(_, _) => Type::Nil, // FIXME
         Expression::Symbol(sym) => {
             if scope.contains_key(&sym) {
                 scope.get(&sym).unwrap()
@@ -352,13 +351,14 @@ fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
                 panic!("Undefined symbol: {:?}", sym)
             }
         }
-        Expression::Value(val) => {
-            type_of_val(&val)
-        }
+        Expression::Value(val) => type_of_val(&val),
     }
 }
 
-fn parse_and_eval(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope, line: &str, show_line: bool) {
+fn parse_and_eval(mut tscope: &mut TypeScope,
+                  mut vscope: &mut ValueScope,
+                  line: &str,
+                  show_line: bool) {
     if show_line {
         println!("lin: {:?}", line);
     }
@@ -373,7 +373,10 @@ fn parse_and_eval(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope, line:
     println!("---")
 }
 
-fn eval_file(tscope: &mut TypeScope, vscope: &mut ValueScope, file: &str) -> Result<(), std::io::Error> {
+fn eval_file(tscope: &mut TypeScope,
+             vscope: &mut ValueScope,
+             file: &str)
+             -> Result<(), std::io::Error> {
     let mut f = try!(File::open(file));
     let mut contents = String::new();
     try!(f.read_to_string(&mut contents));

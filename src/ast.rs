@@ -10,7 +10,6 @@ pub enum Value {
     Vec(Vec<Rc<Value>>),
     Map(BTreeMap<Rc<Value>, Rc<Value>>),
     Fn(Box<(String, Vec<String>, Vec<Expression>)>),
-    RawFn(Box<(Vec<String>, Vec<Expression>)>),
     PrimitiveFn(fn(Vec<Rc<Value>>) -> Value),
 }
 
@@ -21,6 +20,7 @@ pub enum Expression {
     Call(String, Vec<Expression>),
     List(Vec<Expression>),
     Map(Vec<(Expression, Expression)>),
+    Fn(Vec<String>, Vec<Expression>),
     Symbol(String),
     Value(Value),
 }
@@ -33,5 +33,5 @@ pub enum Type {
     Str,
     Vec(Box<Type>),
     Map(Box<(Type, Type)>),
-    Fn(Box<(Vec<Type>, Type)>)
+    Fn(Box<(Vec<Type>, Type)>),
 }
