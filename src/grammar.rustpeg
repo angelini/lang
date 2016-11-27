@@ -13,6 +13,7 @@ expression -> Expression
   / map
   / block
   / string_expr
+  / nil
   / bool
   / int
   / symbol
@@ -21,7 +22,11 @@ call -> Expression
   = i:identifier "(" __ e:comma_delim_exprs __ ")" { Expression::Call(i, e) }
 
 assign -> Expression
-  = i:identifier __ "=" __ e:expression { Expression::Assign(i, Box::new(e)) }
+  = i:typed_ident __ "=" __ e:expression {
+    let (ident, typ) = i;
+    Expression::Assign(Box::new((ident, Some(typ), e)))
+  }
+  / i:identifier __ "=" __ e:expression { Expression::Assign(Box::new((i, None, e))) }
 
 list -> Expression
   = "[" __ e:comma_delim_exprs __ "]" { Expression::List(e) }
@@ -31,6 +36,9 @@ map -> Expression
 
 string_expr -> Expression
   = "\"" s:string_with_ws "\"" { Expression::Value(Value::Str(s)) }
+
+nil -> Expression
+  = "nil" { Expression::Value(Value::Nil) }
 
 bool -> Expression
   = "true" { Expression::Value(Value::Bool(true)) }
@@ -75,6 +83,7 @@ type -> Type
   / vec_type
   / map_type
   / fn_type
+  / var_type
 
 bool_type -> Type
   = "bool" { Type::Bool }
@@ -94,6 +103,9 @@ map_type -> Type
 fn_type -> Type
   = "(" __ a:comma_delim_types __ ")" __ "->" __ o:type { Type::Fn(Box::new((a, o))) }
 
+var_type -> Type
+  = [A-Z] { Type::Var(match_str.to_string()) }
+
 comma_delim_types -> Vec<Type>
   = type ** comma_delim
 
@@ -101,7 +113,7 @@ digits -> i64
   = [0-9]+ { match_str.parse().unwrap() }
 
 identifier -> String
-  = [a-zA-Z] [a-zA-Z0-9_]* { match_str.to_owned() }
+  = [a-zA-Z] [a-zA-Z0-9_]* { match_str.to_string() }
 
 comma_delim = __ "," __
 
@@ -118,10 +130,10 @@ comment = "#" comment_string_with_ws "\n"
 comment_without_nl = "#" comment_string_with_ws { () }
 
 comment_string_with_ws -> String
-  = [a-zA-Z0-9\-><_ =(){}",:'\/]+ { match_str.to_owned() }
+  = [^\n]+ { match_str.to_string() }
 
 string_with_ws -> String
-  = [a-zA-Z0-9_ ]+ { match_str.to_owned() }
+  = [a-zA-Z0-9_ ]+ { match_str.to_string() }
 
 string -> String
-  = [a-zA-Z0-9_]+ { match_str.to_owned() }
+  = [a-zA-Z0-9_]+ { match_str.to_string() }

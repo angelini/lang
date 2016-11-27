@@ -1,5 +1,5 @@
-use ast::Value;
-use scope::ValueScope;
+use ast::{Type, Value};
+use scope::{TypeScope, ValueScope};
 use std::rc::Rc;
 
 macro_rules! args_to_ref {
@@ -72,21 +72,16 @@ fn get(args: Vec<Rc<Value>>) -> Value {
     }
 }
 
-fn len(args: Vec<Rc<Value>>) -> Value {
+fn size(args: Vec<Rc<Value>>) -> Value {
     match args_to_ref!(args)[..] {
         [&Value::Vec(ref l)] => Value::Int(l.len() as i64),
         [&Value::Map(ref m)] => Value::Int(m.len() as i64),
-        [ref a..] => panic!("Invalid args to len: {:?}", a),
+        [ref a..] => panic!("Invalid args to size: {:?}", a),
     }
 }
 
 fn keys(args: Vec<Rc<Value>>) -> Value {
     match args_to_ref!(args)[..] {
-        [&Value::Vec(ref l)] => {
-            Value::Vec((0..l.len())
-                .map(|i| Rc::new(Value::Int(i as i64)))
-                .collect::<Vec<Rc<Value>>>())
-        }
         [&Value::Map(ref m)] => Value::Vec(m.keys().map(|k| k.clone()).collect::<Vec<Rc<Value>>>()),
         [ref a..] => panic!("Invalid args to len: {:?}", a),
     }
@@ -132,10 +127,6 @@ fn print_pfn(args: Vec<Rc<Value>>) -> Value {
     Value::Nil
 }
 
-fn add_to_scope(scope: &mut ValueScope, key: &str, primitive: fn(Vec<Rc<Value>>) -> Value) {
-    scope.insert(key.to_string(), Rc::new(Value::PrimitiveFn(primitive)))
-}
-
 pub fn if_pfn_marker(_: Vec<Rc<Value>>) -> Value {
     unreachable!()
 }
@@ -144,21 +135,39 @@ pub fn while_pfn_marker(_: Vec<Rc<Value>>) -> Value {
     unreachable!()
 }
 
-pub fn add_primitive_fns(scope: &mut ValueScope) {
-    add_to_scope(scope, "if", if_pfn_marker);
-    add_to_scope(scope, "while", while_pfn_marker);
+pub fn add_primitive_fns(tscope: &mut TypeScope, vscope: &mut ValueScope) {
+    fn type_var(s: &str) -> Type {
+        Type::Var(s.to_string())
+    }
 
-    add_to_scope(scope, "add", add);
-    add_to_scope(scope, "get", get);
-    add_to_scope(scope, "insert", insert);
-    add_to_scope(scope, "keys", keys);
-    add_to_scope(scope, "len", len);
-    add_to_scope(scope, "push", push);
-    add_to_scope(scope, "print", print_pfn);
+    fn map_type() -> Type {
+        Type::Map(Box::new((type_var("k"), type_var("v"))))
+    }
 
-    add_to_scope(scope, "eq", eq_pfn);
-    add_to_scope(scope, "gt", gt_pfn);
-    add_to_scope(scope, "ge", ge_pfn);
-    add_to_scope(scope, "lt", lt_pfn);
-    add_to_scope(scope, "le", le_pfn);
+    fn vec_type(s: &str) -> Type {
+        Type::Vec(Box::new(type_var(s)))
+    }
+
+    let primitives: Vec<(&str, fn(Vec<Rc<Value>>) -> Value, (Vec<Type>, Type))> = vec![
+        ("if", if_pfn_marker, (vec![Type::Bool, type_var("t"), type_var("t")], type_var("t"))),
+        ("while", while_pfn_marker, (vec![Type::Bool, type_var("t")], type_var("t"))),
+        ("add", add, (vec![Type::Int], Type::Int)),
+        ("mget", get, (vec![map_type()], type_var("v"))),
+        ("lget", get, (vec![vec_type("t")], type_var("t"))),
+        ("insert", insert, (vec![map_type()], map_type())),
+        ("keys", keys, (vec![map_type()], vec_type("v"))),
+        ("msize", size, (vec![map_type()], Type::Int)),
+        ("lsize", size, (vec![vec_type("t")], Type::Int)),
+        ("push", push, (vec![vec_type("t")], vec_type("t"))),
+        ("print", print_pfn, (vec![type_var("t")], Type::Nil)),
+        ("eq", eq_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
+        ("gt", gt_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
+        ("ge", ge_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
+        ("lt", lt_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
+        ("le", le_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
+    ];
+    for (symbol, func, types) in primitives {
+        vscope.insert(symbol.to_string(), Rc::new(Value::PrimitiveFn(Box::new((symbol.to_string(), func)))));
+        tscope.insert(symbol.to_string(), Type::Fn(Box::new(types)));
+    }
 }

@@ -13,7 +13,7 @@ use rand::Rng;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use scope::{TypeScope, ValueScope};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fs::File;
 use std::mem;
@@ -118,8 +118,8 @@ fn call_primitive_fn(scope: &mut ValueScope,
 
 fn eval(scope: &mut ValueScope, expr: Expression) -> Rc<Value> {
     match expr {
-        Expression::Assign(sym, e) => {
-            let result = eval(scope, *e);
+        Expression::Assign(box (ref sym, _, ref e)) => {
+            let result = eval(scope, e.clone());
             scope.insert(sym.clone(), result.clone());
             result
         }
@@ -154,7 +154,7 @@ fn eval(scope: &mut ValueScope, expr: Expression) -> Rc<Value> {
                         .collect();
                     call_fn(scope, fn_key, args, block)
                 }
-                Value::PrimitiveFn(func) => call_primitive_fn(scope, arg_exprs, func),
+                Value::PrimitiveFn(box (_, func)) => call_primitive_fn(scope, arg_exprs, func),
                 _ => panic!("Tried to call a non-fn: {:?}", sym),
             }
         }
@@ -189,7 +189,10 @@ fn eval(scope: &mut ValueScope, expr: Expression) -> Rc<Value> {
     }
 }
 
-fn fn_type(scope: &mut TypeScope, args: &[(String, Type)], exprs: &[Expression]) -> (Vec<Type>, Type) {
+fn fn_type(scope: &mut TypeScope,
+           args: &[(String, Type)],
+           exprs: &[Expression])
+           -> (Vec<Type>, Type) {
     let mut arg_types = vec![];
     scope.descend();
 
@@ -203,7 +206,7 @@ fn fn_type(scope: &mut TypeScope, args: &[(String, Type)], exprs: &[Expression])
         if i == last {
             let result = type_check(scope, expr.clone());
             scope.ascend();
-            return (arg_types, result)
+            return (arg_types, result);
         } else {
             type_check(scope, expr.clone());
         }
@@ -211,6 +214,14 @@ fn fn_type(scope: &mut TypeScope, args: &[(String, Type)], exprs: &[Expression])
     scope.ascend();
     (arg_types, Type::Nil)
 }
+
+fn primitive_fn_type(scope: &mut TypeScope, symbol: &str) -> (Vec<Type>, Type) {
+    match scope.get(symbol) {
+        Some(Type::Fn(box (ref arg_types, ref ret_type))) => (arg_types.clone(), ret_type.clone()),
+        _ => panic!("Type error: primitive fn not found: {}", symbol),
+    }
+}
+
 
 fn value_to_type(scope: &mut TypeScope, val: &Value) -> Type {
     match *val {
@@ -281,19 +292,102 @@ fn value_to_type(scope: &mut TypeScope, val: &Value) -> Type {
                 _ => unreachable!(),
             }
         }
-        Value::Fn(box (_, ref args, ref exprs)) => {
-            Type::Fn(Box::new(fn_type(scope, args, exprs)))
+        Value::Fn(box (_, ref args, ref exprs)) => Type::Fn(Box::new(fn_type(scope, args, exprs))),
+        Value::PrimitiveFn(box (ref symbol, _)) => {
+            Type::Fn(Box::new(primitive_fn_type(scope, symbol)))
         }
-        Value::PrimitiveFn(_) => Type::Nil,
+    }
+}
+
+fn bind_type(bindings: &mut HashMap<String, Type>,
+             unbound: &Type,
+             expected: Option<&Type>)
+             -> Type {
+    match *unbound {
+        Type::Unknown => {
+            match expected {
+                Some(typ) => typ.clone(),
+                None => Type::Unknown,
+            }
+        }
+        Type::Var(ref name) => {
+            {
+                if !bindings.contains_key(name) {
+                    match expected {
+                        Some(typ) => bindings.insert(name.to_string(), typ.clone()),
+                        None => bindings.insert(name.to_string(), Type::Var(name.clone())),
+                    };
+                }
+            }
+            bindings.get(name).unwrap().clone()
+        }
+        Type::Vec(box ref t) => {
+            let expected_t = match expected {
+                Some(&Type::Vec(box ref expected_t)) => Some(expected_t),
+                None => None,
+                _ => {
+                    panic!("Binding error, unbound: {:?} expected: {:?}",
+                           unbound,
+                           expected)
+                }
+            };
+            Type::Vec(Box::new(bind_type(bindings, t, expected_t)))
+        }
+        Type::Map(box (ref key_t, ref val_t)) => {
+            let (expected_key_t, expected_val_t) = match expected {
+                Some(&Type::Map(box (ref expected_key_t, ref expected_val_t))) => {
+                    (Some(expected_key_t), Some(expected_val_t))
+                }
+                None => (None, None),
+                _ => {
+                    panic!("Binding error, unbound: {:?} expected: {:?}",
+                           unbound,
+                           expected)
+                }
+            };
+            Type::Map(Box::new((bind_type(bindings, key_t, expected_key_t),
+                                bind_type(bindings, val_t, expected_val_t))))
+        }
+        Type::Fn(box (ref arg_types, ref ret_type)) => {
+            match expected {
+                Some(&Type::Fn(box (ref exp_arg_types, ref exp_ret_type))) => {
+                    let bound_args = arg_types.iter()
+                        .zip(exp_arg_types.iter())
+                        .map(|(typ, expected)| bind_type(bindings, typ, Some(expected)))
+                        .collect();
+                    Type::Fn(Box::new((bound_args,
+                                       bind_type(bindings, ret_type, Some(exp_ret_type)))))
+                }
+                None => {
+                    let bound_args = arg_types.iter()
+                        .map(|typ| bind_type(bindings, typ, None))
+                        .collect();
+                    Type::Fn(Box::new((bound_args, bind_type(bindings, ret_type, None))))
+                }
+                _ => {
+                    panic!("Binding error, unbound: {:?} expected: {:?}",
+                           unbound,
+                           expected)
+                }
+            }
+        }
+        ref unbound => unbound.clone(),
     }
 }
 
 fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
     match expr {
-        Expression::Assign(sym, e) => {
-            let result = type_check(scope, *e);
+        Expression::Assign(box (ref sym, ref hint, ref e)) => {
+            let expr_type = type_check(scope, e.clone());
+            let mut bindings = HashMap::new();
+
+            let result = match *hint {
+                Some(ref h) => bind_type(&mut bindings, &expr_type, Some(h)),
+                None => bind_type(&mut bindings, &expr_type, None),
+            };
+
             scope.insert(sym.clone(), result.clone());
-            result
+            result.clone()
         }
         Expression::Block(exprs) => {
             scope.descend();
@@ -315,23 +409,25 @@ fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
                 Some(typ) => typ,
                 None => panic!("Undefined symbol: {:?}", sym),
             };
-
             match fn_type {
                 Type::Fn(box (ref arg_types, ref ret_type)) => {
-                    for (expr, typ) in arg_exprs.into_iter().zip(arg_types.into_iter()) {
-                        let result = type_check(scope, expr);
-                        if &result != typ {
-                            panic!("Type error, expected: {:?} got: {:?}", typ, result)
+                    let mut bindings = HashMap::new();
+
+                    for (expr, unbound_type) in arg_exprs.into_iter().zip(arg_types.into_iter()) {
+                        let expected = type_check(scope, expr);
+                        let bound = bind_type(&mut bindings, &unbound_type, Some(&expected));
+                        if bound != expected {
+                            panic!("Type error, expected: {:?} got: {:?}", expected, bound)
                         }
                     }
-                    ret_type.clone()
+                    bind_type(&mut bindings, ret_type, None)
                 }
                 _ => panic!("Tried to call a non-fn: {:?}", sym),
             }
         }
         Expression::List(mut exprs) => {
             if exprs.is_empty() {
-                return Type::Nil;
+                return Type::Vec(Box::new(Type::Unknown));
             }
 
             let last = exprs.pop().unwrap();
@@ -347,7 +443,7 @@ fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
         }
         Expression::Map(mut pairs) => {
             if pairs.is_empty() {
-                return Type::Nil;
+                return Type::Map(Box::new((Type::Unknown, Type::Unknown)));
             }
 
             let (key, val) = pairs.pop().unwrap();
@@ -369,9 +465,7 @@ fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
             }
             Type::Map(Box::new((key_typ, val_typ)))
         }
-        Expression::Fn(ref args, ref exprs) => {
-            Type::Fn(Box::new(fn_type(scope, args, exprs)))
-        }
+        Expression::Fn(ref args, ref exprs) => Type::Fn(Box::new(fn_type(scope, args, exprs))),
         Expression::Symbol(sym) => {
             if scope.contains_key(&sym) {
                 scope.get(&sym).unwrap()
@@ -412,7 +506,10 @@ fn eval_file(tscope: &mut TypeScope,
     match grammar::expressions(&contents.trim()) {
         Ok(exprs) => {
             for expr in exprs {
-                eval(vscope, expr);
+                println!("exp: {:?}", expr);
+                println!("typ: {:?}", type_check(tscope, expr.clone()));
+                println!("ret: {:?}", eval(vscope, expr));
+                println!("---")
             }
         }
         Err(err) => panic!("parse error: {:?}", err),
@@ -425,7 +522,10 @@ const HISTORY_FILE: &'static str = "history.txt";
 fn start_repl(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope) {
     parse_and_eval(&mut tscope, &mut vscope, "foo = 1", true);
     parse_and_eval(&mut tscope, &mut vscope, "bar = [1, 2, foo]", true);
-    parse_and_eval(&mut tscope, &mut vscope, "identity = fn (id: int) { id }", true);
+    parse_and_eval(&mut tscope,
+                   &mut vscope,
+                   "identity = fn (id: T) { id }",
+                   true);
 
     let mut rl = Editor::<()>::new();
     if let Err(_) = rl.load_history(HISTORY_FILE) {
@@ -465,7 +565,7 @@ fn main() {
 
     let mut tscope = TypeScope::new();
     let mut vscope = ValueScope::new();
-    primitives::add_primitive_fns(&mut vscope);
+    primitives::add_primitive_fns(&mut tscope, &mut vscope);
 
     match args[1..] {
         [ref file] => eval_file(&mut tscope, &mut vscope, file).unwrap(),

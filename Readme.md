@@ -24,7 +24,7 @@ int = 1
 bool = true
 list = [1, 2, 3]
 map = { "a": 1, "b": 2 }
-func = fn (x) { x }
+func = fn (x: int) { x }
 
 # If / While
 
@@ -41,16 +41,16 @@ while(lt(a, 3), {
 
 # Immutable data structures
 
-eq(get(map, "a"), 1)
+eq(mget(map, "a"), 1)
 
 new_map = insert(map, "c", 3)
 
-eq(get(new_map, "c"), 3)
+eq(mget(new_map, "c"), 3)
 
 # First class functions
 
-add_n = fn (n) {
-  fn (x) { add(x, n) }
+add_n = fn (n: int) {
+  fn (x: int) { add(x, n) }
 }
 
 add_2 = add_n(2)
@@ -59,27 +59,21 @@ add_3 = add_n(3)
 print(add_2(1))
 print(add_3(1))
 
-# For loop implementation
+# Map implementation
 
-for = fn (coll, func) {
+map = fn (coll: vec[T], func: (T) -> R) {
     i = 0
-    ks = keys(coll)
-    size = len(ks)
+    result: vec[R] = []
 
-    while(lt(i, size), {
-        key = get(ks, i)
-        func(key, get(coll, key))
+    while(lt(i, lsize(coll)), {
+        result = push(result, func(lget(coll, i)))
         i = add(i, 1)
     })
+
+    result
 }
 
-for([5, 6, 7, 8], fn (i, v) {
-    print("i", i)
-    print("v", v)
-})
+mapped = map([3, 4, 5], fn(v: int) { print("in map", v) add(v, 5) })
 
-for({"a": 1, "b": 2}, fn (k, v) {
-    print("k", k)
-    print("v", v)
-})
+print("mapped", mapped)
 ```
