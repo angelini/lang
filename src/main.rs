@@ -21,6 +21,32 @@ use std::io::prelude::*;
 
 peg_file! grammar("grammar.rustpeg");
 
+fn verbose_eval(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope, expr: Expression) {
+    let expr_debug = format!("expression: {:?}", expr);
+    match types::type_check(tscope, &expr) {
+        Ok(typ) => {
+            println!("typ: {:?}", typ);
+        }
+        Err(e) => {
+            println!("type error: {}", e);
+            println!("{}", expr_debug);
+            return;
+        }
+    }
+
+    match eval::eval(vscope, expr) {
+        Ok(val) => {
+            println!("ret: {:?}", val);
+        }
+        Err(e) => {
+            println!("eval error: {}", e);
+            println!("{}", expr_debug);
+            return;
+        }
+    }
+    println!("---")
+}
+
 fn parse_and_eval(mut tscope: &mut TypeScope,
                   mut vscope: &mut ValueScope,
                   line: &str,
@@ -33,19 +59,7 @@ fn parse_and_eval(mut tscope: &mut TypeScope,
         Err(err) => return println!("parse error: {:?}", err),
     };
 
-    match types::type_check(tscope, &expr) {
-        Ok(typ) => {
-            println!("typ: {:?}", typ);
-            println!("ret: {:?}", eval::eval(vscope, expr));
-        }
-        Err(e) => {
-            println!("type error: {}", e);
-            println!("at line:    {}", line);
-            println!("expression: {:?}", expr);
-            return
-        }
-    }
-    println!("---")
+    verbose_eval(tscope, vscope, expr)
 }
 
 fn eval_file(tscope: &mut TypeScope,
@@ -59,10 +73,7 @@ fn eval_file(tscope: &mut TypeScope,
     match grammar::expressions(&contents.trim()) {
         Ok(exprs) => {
             for expr in exprs {
-                println!("exp: {:?}", expr);
-                println!("typ: {:?}", types::type_check(tscope, &expr));
-                println!("ret: {:?}", eval::eval(vscope, expr));
-                println!("---")
+                verbose_eval(tscope, vscope, expr)
             }
         }
         Err(err) => panic!("parse error: {:?}", err),
