@@ -159,7 +159,7 @@ pub fn eval(scope: &mut ValueScope, expr: Expression) -> Rc<Value> {
             let num = rand::thread_rng().gen_range(10000, 99999);
             let fn_key = format!("fn_{}", num);
             scope.tag_self_and_parents(&fn_key);
-            Rc::new(Value::Fn(Box::new((fn_key, args, exprs))))
+            Rc::new(Value::Fn(box (fn_key, args, exprs)))
         }
         Expression::Symbol(sym) => {
             if scope.contains_key(&sym) {

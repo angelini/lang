@@ -141,11 +141,11 @@ pub fn add_primitive_fns(tscope: &mut TypeScope, vscope: &mut ValueScope) {
     }
 
     fn map_type() -> Type {
-        Type::Map(Box::new((type_var("k"), type_var("v"))))
+        Type::Map(box (type_var("k"), type_var("v")))
     }
 
     fn vec_type(s: &str) -> Type {
-        Type::Vec(Box::new(type_var(s)))
+        Type::Vec(box type_var(s))
     }
 
     let primitives: Vec<(&str, fn(Vec<Rc<Value>>) -> Value, (Vec<Type>, Type))> = vec![
@@ -167,7 +167,7 @@ pub fn add_primitive_fns(tscope: &mut TypeScope, vscope: &mut ValueScope) {
         ("le", le_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
     ];
     for (symbol, func, types) in primitives {
-        vscope.insert(symbol.to_string(), Rc::new(Value::PrimitiveFn(Box::new((symbol.to_string(), func)))));
-        tscope.insert(symbol.to_string(), Type::Fn(Box::new(types)));
+        vscope.insert(symbol.to_string(), Rc::new(Value::PrimitiveFn(box (symbol.to_string(), func))));
+        tscope.insert(symbol.to_string(), Type::Fn(box types));
     }
 }

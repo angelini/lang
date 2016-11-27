@@ -1,4 +1,4 @@
-#![feature(advanced_slice_patterns, box_patterns, plugin, slice_patterns)]
+#![feature(advanced_slice_patterns, box_patterns, box_syntax, plugin, slice_patterns)]
 #![plugin(peg_syntax_ext)]
 
 extern crate rand;
@@ -28,13 +28,22 @@ fn parse_and_eval(mut tscope: &mut TypeScope,
     if show_line {
         println!("lin: {:?}", line);
     }
-    match grammar::expression(&line) {
-        Ok(expr) => {
-            println!("typ: {:?}", types::type_check(tscope, &expr));
+    let expr = match grammar::expression(&line) {
+        Ok(expr) => expr,
+        Err(err) => return println!("parse error: {:?}", err),
+    };
+
+    match types::type_check(tscope, &expr) {
+        Ok(typ) => {
+            println!("typ: {:?}", typ);
             println!("ret: {:?}", eval::eval(vscope, expr));
-            println!("scp: {:?}", vscope);
         }
-        Err(err) => println!("parse error: {:?}", err),
+        Err(e) => {
+            println!("type error: {}", e);
+            println!("at line:    {}", line);
+            println!("expression: {:?}", expr);
+            return
+        }
     }
     println!("---")
 }
