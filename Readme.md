@@ -59,7 +59,7 @@ add_3 = add_n(3)
 print(add_2(1))
 print(add_3(1))
 
-# Map implementation
+# Map & Filter implementation
 
 map = fn (coll: vec[T], func: (T) -> R) {
     i = 0
@@ -75,5 +75,24 @@ map = fn (coll: vec[T], func: (T) -> R) {
 
 mapped = map([3, 4, 5], fn(v: int) { print("in map", v) add(v, 5) })
 
+filter = fn (coll: vec[T], func: (T) -> bool) {
+    i = 0
+    result: vec[T] = []
+
+    while(lt(i, lsize(coll)), {
+        item = lget(coll, i)
+        if(func(item), {
+           result = push(result, item)
+           nil
+        }, nil)
+        i = add(i, 1)
+    })
+
+    result
+}
+
+filtered = filter(["a", "b", "c"], fn(s: str) { print("in filter", s) eq(s, "b") })
+
 print("mapped", mapped)
+print("filtered", filtered)
 ```
