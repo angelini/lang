@@ -21,30 +21,31 @@ use std::io::prelude::*;
 
 peg_file! grammar("grammar.rustpeg");
 
-fn verbose_eval(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope, expr: Expression) {
-    let expr_debug = format!("expression: {:?}", expr);
+fn verbose_eval(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope, expr: Expression) -> bool {
+    println!("exp: {:?}", expr);
     match types::type_check(tscope, &expr) {
         Ok(typ) => {
             println!("typ: {:?}", typ);
         }
         Err(e) => {
             println!("type error: {}", e);
-            println!("{}", expr_debug);
-            return;
+            println!("expression: {:?}", expr);
+            return false;
         }
     }
 
-    match eval::eval(vscope, expr) {
+    match eval::eval(vscope, &expr) {
         Ok(val) => {
             println!("ret: {:?}", val);
         }
         Err(e) => {
             println!("eval error: {}", e);
-            println!("{}", expr_debug);
-            return;
+            println!("expression: {:?}", expr);
+            return false;
         }
     }
-    println!("---")
+    println!("---");
+    true
 }
 
 fn parse_and_eval(mut tscope: &mut TypeScope,
@@ -59,7 +60,7 @@ fn parse_and_eval(mut tscope: &mut TypeScope,
         Err(err) => return println!("parse error: {:?}", err),
     };
 
-    verbose_eval(tscope, vscope, expr)
+    verbose_eval(tscope, vscope, expr);
 }
 
 fn eval_file(tscope: &mut TypeScope,
@@ -73,7 +74,9 @@ fn eval_file(tscope: &mut TypeScope,
     match grammar::expressions(&contents.trim()) {
         Ok(exprs) => {
             for expr in exprs {
-                verbose_eval(tscope, vscope, expr)
+                if !verbose_eval(tscope, vscope, expr) {
+                    panic!()
+                }
             }
         }
         Err(err) => panic!("parse error: {:?}", err),
