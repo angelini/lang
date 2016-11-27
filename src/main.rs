@@ -29,9 +29,9 @@ fn parse_and_eval(mut tscope: &mut TypeScope,
         println!("lin: {:?}", line);
     }
     match grammar::expression(&line) {
-        Ok(e) => {
-            println!("typ: {:?}", types::type_check(tscope, e.clone()));
-            println!("ret: {:?}", eval::eval(vscope, e));
+        Ok(expr) => {
+            println!("typ: {:?}", types::type_check(tscope, &expr));
+            println!("ret: {:?}", eval::eval(vscope, expr));
             println!("scp: {:?}", vscope);
         }
         Err(err) => println!("parse error: {:?}", err),
@@ -51,7 +51,7 @@ fn eval_file(tscope: &mut TypeScope,
         Ok(exprs) => {
             for expr in exprs {
                 println!("exp: {:?}", expr);
-                println!("typ: {:?}", types::type_check(tscope, expr.clone()));
+                println!("typ: {:?}", types::type_check(tscope, &expr));
                 println!("ret: {:?}", eval::eval(vscope, expr));
                 println!("---")
             }

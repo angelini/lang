@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 fn fn_type(scope: &mut TypeScope,
            args: &[(String, Type)],
-           exprs: &[Expression])
+           exprs: &[&Expression])
            -> (Vec<Type>, Type) {
     let mut arg_types = vec![];
     scope.descend();
@@ -15,13 +15,13 @@ fn fn_type(scope: &mut TypeScope,
     }
 
     let last = exprs.len() - 1;
-    for (i, expr) in exprs.into_iter().enumerate() {
+    for (i, expr) in exprs.iter().enumerate() {
         if i == last {
-            let result = type_check(scope, expr.clone());
+            let result = type_check(scope, expr);
             scope.ascend();
             return (arg_types, result);
         } else {
-            type_check(scope, expr.clone());
+            type_check(scope, expr);
         }
     }
     scope.ascend();
@@ -34,7 +34,6 @@ fn primitive_fn_type(scope: &mut TypeScope, symbol: &str) -> (Vec<Type>, Type) {
         _ => panic!("Type error: primitive fn not found: {}", symbol),
     }
 }
-
 
 fn value_to_type(scope: &mut TypeScope, val: &Value) -> Type {
     match *val {
@@ -105,7 +104,9 @@ fn value_to_type(scope: &mut TypeScope, val: &Value) -> Type {
                 _ => unreachable!(),
             }
         }
-        Value::Fn(box (_, ref args, ref exprs)) => Type::Fn(Box::new(fn_type(scope, args, exprs))),
+        Value::Fn(box (_, ref args, ref exprs)) => {
+            Type::Fn(Box::new(fn_type(scope, args, &exprs.iter().collect::<Vec<&Expression>>())))
+        }
         Value::PrimitiveFn(box (ref symbol, _)) => {
             Type::Fn(Box::new(primitive_fn_type(scope, symbol)))
         }
@@ -124,13 +125,11 @@ fn bind_type(bindings: &mut HashMap<String, Type>,
             }
         }
         Type::Var(ref name) => {
-            {
-                if !bindings.contains_key(name) {
-                    match expected {
-                        Some(typ) => bindings.insert(name.to_string(), typ.clone()),
-                        None => bindings.insert(name.to_string(), Type::Var(name.clone())),
-                    };
-                }
+            if !bindings.contains_key(name) {
+                match expected {
+                    Some(typ) => bindings.insert(name.to_string(), typ.clone()),
+                    None => bindings.insert(name.to_string(), Type::Var(name.clone())),
+                };
             }
             bindings.get(name).unwrap().clone()
         }
@@ -188,10 +187,10 @@ fn bind_type(bindings: &mut HashMap<String, Type>,
     }
 }
 
-pub fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
-    match expr {
+pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Type {
+    match *expr {
         Expression::Assign(box (ref sym, ref hint, ref e)) => {
-            let expr_type = type_check(scope, e.clone());
+            let expr_type = type_check(scope, e);
             let mut bindings = HashMap::new();
 
             let result = match *hint {
@@ -202,22 +201,22 @@ pub fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
             scope.insert(sym.clone(), result.clone());
             result.clone()
         }
-        Expression::Block(exprs) => {
+        Expression::Block(ref exprs) => {
             scope.descend();
             let last = exprs.len() - 1;
             for (i, expr) in exprs.into_iter().enumerate() {
                 if i == last {
-                    let result = type_check(scope, expr.clone());
+                    let result = type_check(scope, &expr);
                     scope.ascend();
                     return result;
                 } else {
-                    type_check(scope, expr.clone());
+                    type_check(scope, &expr);
                 }
             }
             scope.ascend();
             Type::Nil
         }
-        Expression::Call(sym, arg_exprs) => {
+        Expression::Call(ref sym, ref arg_exprs) => {
             let fn_type = match scope.get(&sym) {
                 Some(typ) => typ,
                 None => panic!("Undefined symbol: {:?}", sym),
@@ -227,7 +226,7 @@ pub fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
                     let mut bindings = HashMap::new();
 
                     for (expr, unbound_type) in arg_exprs.into_iter().zip(arg_types.into_iter()) {
-                        let expected = type_check(scope, expr);
+                        let expected = type_check(scope, &expr);
                         let bound = bind_type(&mut bindings, &unbound_type, Some(&expected));
                         if bound != expected {
                             panic!("Type error, expected: {:?} got: {:?}", expected, bound)
@@ -238,38 +237,38 @@ pub fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
                 _ => panic!("Tried to call a non-fn: {:?}", sym),
             }
         }
-        Expression::List(mut exprs) => {
+        Expression::List(ref exprs) => {
             if exprs.is_empty() {
                 return Type::Vec(Box::new(Type::Unknown));
             }
 
-            let last = exprs.pop().unwrap();
-            let typ = type_check(scope, last);
+            let first = exprs.get(0).unwrap();
+            let typ = type_check(scope, &first);
 
-            for expr in exprs.into_iter() {
-                let result = type_check(scope, expr);
+            for expr in exprs.iter().skip(1) {
+                let result = type_check(scope, &expr);
                 if result != typ {
                     panic!("Type error, expected: {:?} got: {:?}", typ, result)
                 }
             }
             Type::Vec(Box::new(typ))
         }
-        Expression::Map(mut pairs) => {
+        Expression::Map(ref pairs) => {
             if pairs.is_empty() {
                 return Type::Map(Box::new((Type::Unknown, Type::Unknown)));
             }
 
-            let (key, val) = pairs.pop().unwrap();
-            let (key_typ, val_typ) = (type_check(scope, key), type_check(scope, val));
+            let &(ref key, ref val) = pairs.get(0).unwrap();
+            let (key_typ, val_typ) = (type_check(scope, &key), type_check(scope, &val));
 
-            for (key, val) in pairs.into_iter() {
-                let actual_key_typ = type_check(scope, key);
+            for &(ref key, ref val) in pairs.iter().skip(1) {
+                let actual_key_typ = type_check(scope, &key);
                 if actual_key_typ != key_typ {
                     panic!("Type error, expected: {:?} got: {:?}",
                            key_typ,
                            actual_key_typ)
                 }
-                let actual_val_typ = type_check(scope, val);
+                let actual_val_typ = type_check(scope, &val);
                 if actual_val_typ != val_typ {
                     panic!("Type error, expected: {:?} got: {:?}",
                            key_typ,
@@ -278,14 +277,16 @@ pub fn type_check(scope: &mut TypeScope, expr: Expression) -> Type {
             }
             Type::Map(Box::new((key_typ, val_typ)))
         }
-        Expression::Fn(ref args, ref exprs) => Type::Fn(Box::new(fn_type(scope, args, exprs))),
-        Expression::Symbol(sym) => {
-            if scope.contains_key(&sym) {
+        Expression::Fn(ref args, ref exprs) => {
+            Type::Fn(Box::new(fn_type(scope, args, &exprs.iter().collect::<Vec<&Expression>>())))
+        }
+        Expression::Symbol(ref sym) => {
+            if scope.contains_key(sym) {
                 scope.get(&sym).unwrap()
             } else {
                 panic!("Undefined symbol: {:?}", sym)
             }
         }
-        Expression::Value(val) => value_to_type(scope, &val),
+        Expression::Value(ref val) => value_to_type(scope, val),
     }
 }
