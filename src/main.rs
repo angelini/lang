@@ -17,6 +17,7 @@ use scope::{TypeScope, ValueScope};
 use std::env;
 use std::fs::File;
 use std::mem;
+use std::io;
 use std::io::prelude::*;
 
 peg_file! grammar("grammar.rustpeg");
@@ -123,6 +124,33 @@ fn start_repl(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope) {
     rl.save_history(HISTORY_FILE).unwrap();
 }
 
+fn eval_stream(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope) {
+    println!("====START====");
+    let stdin = io::stdin();
+    let mut lines = vec![];
+    for line in stdin.lock().lines() {
+        match line {
+            Ok(l) => {
+                if &l == "====EXEC====" {
+                    match grammar::expressions(&lines.join("\n")) {
+                        Ok(exprs) => {
+                            for expr in exprs {
+                                verbose_eval(&mut tscope, &mut vscope, expr);
+                            }
+                        }
+                        Err(_) => panic!()
+                    }
+                    lines.clear();
+                    println!("====END====");
+                } else {
+                    lines.push(l);
+                }
+            }
+            Err(_) => panic!()
+        }
+    }
+}
+
 fn main() {
     println!("mem::size_of::<Value>(): {:?}", mem::size_of::<Value>());
     println!("mem::size_of::<Expression>(): {:?}",
@@ -135,7 +163,14 @@ fn main() {
     primitives::add_primitive_fns(&mut tscope, &mut vscope);
 
     match args[1..] {
-        [ref file] => eval_file(&mut tscope, &mut vscope, file).unwrap(),
-        _ => start_repl(&mut tscope, &mut vscope),
+        [] => start_repl(&mut tscope, &mut vscope),
+        [ref arg] => {
+            if arg == "__stream__" {
+                eval_stream(&mut tscope, &mut vscope)
+            } else {
+                eval_file(&mut tscope, &mut vscope, arg).unwrap()
+            }
+        }
+        _ => panic!("Invalid process args {:?}", args),
     }
 }

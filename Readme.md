@@ -10,6 +10,12 @@ cargo run example.lang
 cargo run
 ```
 
+### Run tests
+
+```
+python tests.py
+```
+
 ### Language
 
 ```
