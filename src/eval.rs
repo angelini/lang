@@ -43,7 +43,7 @@ fn call_fn(scope: &mut ValueScope,
 
     let scope_id = scope.descend_from(fn_key);
     for (name, arg) in args {
-        scope.insert(name.to_string(), try!(arg));
+        scope.insert_local(name.to_string(), try!(arg));
     }
 
     let last = block.len() - 1;
@@ -136,9 +136,13 @@ fn call_primitive_fn(scope: &mut ValueScope,
 
 pub fn eval(scope: &mut ValueScope, expr: &Expression) -> Result<Rc<Value>> {
     match *expr {
-        Expression::Assign(box (ref sym, _, ref e)) => {
+        Expression::Assign(box (local, ref sym, _, ref e)) => {
             let result = try!(eval(scope, e));
-            scope.insert(sym.clone(), result.clone());
+            if local {
+                scope.insert_local(sym.clone(), result.clone())
+            } else {
+                scope.update(sym.clone(), result.clone())
+            }
             Ok(result)
         }
         Expression::Block(ref exprs) => {

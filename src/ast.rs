@@ -28,7 +28,7 @@ pub enum Value {
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Expression {
-    Assign(Box<(String, Option<Type>, Expression)>),
+    Assign(Box<(bool, String, Option<Type>, Expression)>),
     Block(Vec<Expression>),
     Call(String, Vec<Expression>),
     List(Vec<Expression>),

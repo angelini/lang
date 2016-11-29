@@ -23,7 +23,9 @@ impl fmt::Display for Error {
             }
             Error::CallNonFn(ref typ) => write!(f, "Called a non fn {:?}", typ),
             Error::PrimitiveFnNotFound(ref name) => write!(f, "Primitive fn not found {}", name),
-            Error::TypeMismatch(ref exp, ref act) => write!(f, "Type mismatch {:?} != {:?}", exp, act),
+            Error::TypeMismatch(ref exp, ref act) => {
+                write!(f, "Type mismatch {:?} != {:?}", exp, act)
+            }
             Error::UndefinedSymbol(ref sym) => write!(f, "Undefined symbol {}", sym),
         }
     }
@@ -199,7 +201,7 @@ fn bind_type(bindings: &mut HashMap<String, Type>,
 
 pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
     match *expr {
-        Expression::Assign(box (ref sym, ref hint, ref e)) => {
+        Expression::Assign(box (local, ref sym, ref hint, ref e)) => {
             let expr_type = try!(type_check(scope, e));
             let mut bindings = HashMap::new();
 
@@ -208,7 +210,19 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
                 None => try!(bind_type(&mut bindings, &expr_type, None)),
             };
 
-            scope.insert(sym.clone(), result.clone());
+            if local {
+                scope.insert(sym.clone(), result.clone())
+            } else {
+                match scope.get(sym) {
+                    Some(current_type) => {
+                        if result != current_type {
+                            panic!("Type mistmatch {:?} {:?}", current_type, result)
+                        }
+                    }
+                    None => panic!("Undefined var: {}", sym),
+                }
+
+            }
             Ok(result.clone())
         }
         Expression::Block(ref exprs) => {

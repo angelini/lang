@@ -88,11 +88,11 @@ fn eval_file(tscope: &mut TypeScope,
 const HISTORY_FILE: &'static str = "history.txt";
 
 fn start_repl(mut tscope: &mut TypeScope, mut vscope: &mut ValueScope) {
-    parse_and_eval(&mut tscope, &mut vscope, "foo = 1", true);
-    parse_and_eval(&mut tscope, &mut vscope, "bar = [1, 2, foo]", true);
+    parse_and_eval(&mut tscope, &mut vscope, "let foo = 1", true);
+    parse_and_eval(&mut tscope, &mut vscope, "let bar = [1, 2, foo]", true);
     parse_and_eval(&mut tscope,
                    &mut vscope,
-                   "identity = fn (id: T) { id }",
+                   "let identity = fn (id: T) { id }",
                    true);
 
     let mut rl = Editor::<()>::new();

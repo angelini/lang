@@ -1,4 +1,5 @@
 import inspect
+import os
 import sys
 from subprocess import Popen, PIPE
 
@@ -25,6 +26,16 @@ def read_until(p, marker):
         buf += p.stdout.read(1)
         if buf.endswith(marker):
             return buf[:-len(marker)]
+        if p.poll() is not None:
+            print('')
+            print('===> Process Died')
+            print(' from:', inspect.stack()[2][3])
+            print('')
+            print('  stdout:')
+            print(buf)
+            print('  stderr:')
+            print(p.stderr.read())
+            sys.exit(1)
 
 
 def eval_exprs(p, exprs_str):
@@ -97,8 +108,8 @@ def test_if(p):
 
 def test_while(p):
     out = eval_exprs(p, """
-        result = 0
-        i = 0
+        let result = 0
+        let i = 0
 
         while(lt(i, 10), {
             i = add(i, 1)
@@ -113,13 +124,13 @@ def test_while(p):
 
 def test_closures(p):
     out = eval_exprs(p, """
-        lambda = fn () {
-            closed = 4
+        let lambda = fn () {
+            let closed = 4
             fn () {
                 closed
             }
         }
-        inner = lambda()
+        let inner = lambda()
         inner()
     """)
     assert_val(out[2], 'int(4)')
@@ -127,11 +138,11 @@ def test_closures(p):
 
 def test_immutability(p):
     out = eval_exprs(p, """
-        list = [1, 2, 3]
+        let list = [1, 2, 3]
         push(list, 4)
         list
 
-        map = {"a": 1}
+        let map = {"a": 1}
         insert(map, "b", 2)
         map
     """)
@@ -146,7 +157,7 @@ def test_immutability(p):
 
 def test_generics(p):
     out = eval_exprs(p, """
-        get = fn (coll: map[T, R], key: T) {
+        let get = fn (coll: map[T, R], key: T) {
             mget(coll, key)
         }
         get({"a": 1}, "a")
@@ -170,7 +181,8 @@ def run_tests(p):
 
 
 if __name__ == '__main__':
+    env = dict(list(os.environ.items()) + [("RUST_BACKTRACE", "1")])
     p = Popen(['cargo', 'run', '__stream__'], universal_newlines=True,
-              stdout=PIPE, stdin=PIPE, stderr=PIPE)
+              stdout=PIPE, stdin=PIPE, stderr=PIPE, env=env)
     read_until(p, '====START====')
     run_tests(p)

@@ -22,11 +22,13 @@ call -> Expression
   = i:identifier "(" __ e:comma_delim_exprs __ ")" { Expression::Call(i, e) }
 
 assign -> Expression
-  = i:typed_ident __ "=" __ e:expression {
+  = l:"let"? __ i:typed_ident __ "=" __ e:expression {
     let (ident, typ) = i;
-    Expression::Assign(Box::new((ident, Some(typ), e)))
+    Expression::Assign(Box::new((l.is_some(), ident, Some(typ), e)))
   }
-  / i:identifier __ "=" __ e:expression { Expression::Assign(Box::new((i, None, e))) }
+  / l:"let"? __ i:identifier __ "=" __ e:expression {
+    Expression::Assign(Box::new((l.is_some(), i, None, e)))
+  }
 
 list -> Expression
   = "[" __ e:comma_delim_exprs __ "]" { Expression::List(e) }

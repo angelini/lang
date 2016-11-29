@@ -51,16 +51,11 @@ impl TypeScope {
     }
 
     pub fn insert(&mut self, key: String, val: Type) {
-        let mut id_opt = Some(self.index);
-        while let Some(id) = id_opt {
-            let node = self.nodes.get_mut(id).unwrap();
-            if node.env.contains_key(&key) {
-                node.env.insert(key, val);
-                return;
-            }
-            id_opt = node.parent;
+        let mut node = self.nodes.get_mut(self.index).unwrap();
+        if node.env.contains_key(&key) {
+            panic!("Local binding already exists: {}", key)
         }
-        self.nodes.get_mut(self.index).unwrap().env.insert(key, val);
+        node.env.insert(key, val);
     }
 
     pub fn get(&self, key: &str) -> Option<Type> {
@@ -167,7 +162,15 @@ impl ValueScope {
         self.curr_id = id;
     }
 
-    pub fn insert(&mut self, key: String, val: Rc<Value>) {
+    pub fn insert_local(&mut self, key: String, val: Rc<Value>) {
+        let mut node = self.nodes.get_mut(&self.curr_id).unwrap();
+        if node.env.contains_key(&key) {
+            panic!("Local binding already exists: {}", key)
+        }
+        node.env.insert(key, val);
+    }
+
+    pub fn update(&mut self, key: String, val: Rc<Value>) {
         let mut id_opt = Some(self.curr_id);
         while let Some(id) = id_opt {
             let node = self.nodes.get_mut(&id).unwrap();
@@ -177,7 +180,7 @@ impl ValueScope {
             }
             id_opt = node.parent;
         }
-        self.nodes.get_mut(&self.curr_id).unwrap().env.insert(key, val);
+        panic!("Key not found in scope: {}", key)
     }
 
     pub fn get(&self, key: &str) -> Option<Rc<Value>> {
