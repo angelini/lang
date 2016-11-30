@@ -19,7 +19,7 @@ def parse_output(out):
             if block.strip()]
 
 
-def read_until(p, marker):
+def read_until(p, marker, d=1):
     marker = marker + '\n'
     buf = ''
     while True:
@@ -29,7 +29,7 @@ def read_until(p, marker):
         if p.poll() is not None:
             print('')
             print('===> Process Died')
-            print(' from:', inspect.stack()[2][3])
+            print(' from:', inspect.stack()[d][3])
             print('')
             print('  stdout:')
             print(buf)
@@ -43,8 +43,13 @@ def eval_exprs(p, exprs_str):
     p.stdin.write(with_eval)
     p.stdin.flush()
 
-    out = read_until(p, '====END====')
+    out = read_until(p, '====END====', d=2)
     return parse_output(out)
+
+
+def reset_env(p):
+    p.stdin.write('====RESET====\n')
+    p.stdin.flush()
 
 
 def assert_print(expected, actual):
@@ -177,6 +182,7 @@ def run_tests(p):
         test(p)
         count += 1
         print('.', end='\n' if count % 8 == 0 else '')
+        reset_env(p)
     print()
 
 

@@ -167,7 +167,8 @@ pub fn add_primitive_fns(tscope: &mut TypeScope, vscope: &mut ValueScope) {
         ("le", le_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
     ];
     for (symbol, func, types) in primitives {
-        vscope.insert_local(symbol.to_string(), Rc::new(Value::PrimitiveFn(box (symbol.to_string(), func))));
+        vscope.insert_local(symbol.to_string(),
+                            Rc::new(Value::PrimitiveFn(box (symbol.to_string(), func))));
         tscope.insert(symbol.to_string(), Type::Fn(box types));
     }
 }
