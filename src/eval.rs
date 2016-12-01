@@ -1,7 +1,7 @@
 use ast::{Expression, Value};
 use primitives;
 use rand::{self, Rng};
-use scope::ValueScope;
+use scope::{self, ValueScope};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::rc::Rc;
@@ -12,8 +12,15 @@ pub enum Error {
     CallNonFn(String),
     InvalidPredicate(Value),
     InvalidBlock(Expression),
+    ScopeError(scope::Error),
     UndefinedSymbol(String),
     WrongNumberOfArgs(Vec<String>, Vec<Expression>),
+}
+
+impl From<scope::Error> for Error {
+    fn from(err: scope::Error) -> Error {
+        Error::ScopeError(err)
+    }
 }
 
 pub type Result<T> = result::Result<T, Error>;
@@ -24,6 +31,7 @@ impl fmt::Display for Error {
             Error::CallNonFn(ref val) => write!(f, "Called a non fn {:?}", val),
             Error::InvalidPredicate(ref val) => write!(f, "Invalid predicate {:?}", val),
             Error::InvalidBlock(ref expr) => write!(f, "Invalid block {:?}", expr),
+            Error::ScopeError(ref err) => write!(f, "{}", err),
             Error::UndefinedSymbol(ref sym) => write!(f, "Undefined symbol {}", sym),
             Error::WrongNumberOfArgs(ref args, ref actual) => {
                 write!(f, "Wrong number of args {:?} {:?}", args, actual)
@@ -43,21 +51,21 @@ fn call_fn(scope: &mut ValueScope,
 
     let scope_id = scope.descend_from(fn_key);
     for (name, arg) in args {
-        scope.insert_local(name.to_string(), try!(arg));
+        try!(scope.insert_local(name.to_string(), try!(arg)));
     }
 
     let last = block.len() - 1;
     for (i, expr) in block.iter().enumerate() {
         if i == last {
             let result = eval(scope, &expr);
-            scope.ascend();
+            try!(scope.ascend());
             scope.jump_to(scope_id);
             return result;
         } else {
             try!(eval(scope, &expr));
         }
     }
-    scope.ascend();
+    try!(scope.ascend());
     scope.jump_to(scope_id);
     Ok(Rc::new(Value::Nil))
 }
@@ -105,7 +113,7 @@ fn while_pfn(scope: &mut ValueScope, args: &[Expression]) -> Result<Rc<Value>> {
         for expr in exprs.iter().cloned() {
             result = try!(eval(scope, &expr))
         }
-        scope.ascend();
+        try!(scope.ascend());
 
         pred_bool = match *try!(eval(scope, &pred)) {
             Value::Bool(b) => b,
@@ -139,9 +147,9 @@ pub fn eval(scope: &mut ValueScope, expr: &Expression) -> Result<Rc<Value>> {
         Expression::Assign(box (local, ref sym, _, ref e)) => {
             let result = try!(eval(scope, e));
             if local {
-                scope.insert_local(sym.clone(), result.clone())
+                try!(scope.insert_local(sym.clone(), result.clone()))
             } else {
-                scope.update(sym.clone(), result.clone())
+                try!(scope.update(sym.clone(), result.clone()))
             }
             Ok(result)
         }
@@ -151,13 +159,13 @@ pub fn eval(scope: &mut ValueScope, expr: &Expression) -> Result<Rc<Value>> {
             for (i, expr) in exprs.into_iter().enumerate() {
                 if i == last {
                     let result = eval(scope, &expr);
-                    scope.ascend();
+                    try!(scope.ascend());
                     return result;
                 } else {
                     try!(eval(scope, &expr));
                 }
             }
-            scope.ascend();
+            try!(scope.ascend());
             Ok(Rc::new(Value::Nil))
         }
         Expression::Call(ref sym, ref arg_exprs) => {

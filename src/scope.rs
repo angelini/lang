@@ -1,6 +1,29 @@
 use ast::{Type, Value};
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::rc::Rc;
+use std::result;
+
+#[derive(Debug)]
+pub enum Error {
+    AscendFromRoot,
+    KeyNotFound(String),
+    LocalBindingAlreadyExists(String),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::AscendFromRoot => write!(f, "Tried to ascend from root"),
+            Error::KeyNotFound(ref key) => write!(f, "Key not found {}", key),
+            Error::LocalBindingAlreadyExists(ref key) => {
+                write!(f, "Local binding already exists {}", key)
+            }
+        }
+    }
+}
+
+pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 struct Node<T> {
@@ -42,20 +65,22 @@ impl TypeScope {
         self.nodes.push(Node::new(self.index, Some(self.index - 1)));
     }
 
-    pub fn ascend(&mut self) {
+    pub fn ascend(&mut self) -> Result<()> {
         let node = self.nodes.remove(self.index);
         self.index = match node.parent {
             Some(parent) => parent,
-            None => panic!("Ascending from root"),
-        }
+            None => return Err(Error::AscendFromRoot),
+        };
+        Ok(())
     }
 
-    pub fn insert(&mut self, key: String, val: Type) {
+    pub fn insert(&mut self, key: String, val: Type) -> Result<()> {
         let mut node = self.nodes.get_mut(self.index).unwrap();
         if node.env.contains_key(&key) {
-            panic!("Local binding already exists: {}", key)
+            return Err(Error::LocalBindingAlreadyExists(key));
         }
         node.env.insert(key, val);
+        Ok(())
     }
 
     pub fn get(&self, key: &str) -> Option<Type> {
@@ -119,7 +144,7 @@ impl ValueScope {
     }
 
     #[allow(unused_assignments)]
-    pub fn ascend(&mut self) {
+    pub fn ascend(&mut self) -> Result<()> {
         let mut parent = None;
         let mut to_remove = vec![];
         {
@@ -154,33 +179,35 @@ impl ValueScope {
 
         self.curr_id = match parent {
             Some(parent) => parent,
-            None => panic!("Ascending from root"),
+            None => return Err(Error::AscendFromRoot),
         };
+        Ok(())
     }
 
     pub fn jump_to(&mut self, id: usize) {
         self.curr_id = id;
     }
 
-    pub fn insert_local(&mut self, key: String, val: Rc<Value>) {
+    pub fn insert_local(&mut self, key: String, val: Rc<Value>) -> Result<()> {
         let mut node = self.nodes.get_mut(&self.curr_id).unwrap();
         if node.env.contains_key(&key) {
-            panic!("Local binding already exists: {}", key)
+            return Err(Error::LocalBindingAlreadyExists(key));
         }
         node.env.insert(key, val);
+        Ok(())
     }
 
-    pub fn update(&mut self, key: String, val: Rc<Value>) {
+    pub fn update(&mut self, key: String, val: Rc<Value>) -> Result<()> {
         let mut id_opt = Some(self.curr_id);
         while let Some(id) = id_opt {
             let node = self.nodes.get_mut(&id).unwrap();
             if node.env.contains_key(&key) {
                 node.env.insert(key, val);
-                return;
+                return Ok(());
             }
             id_opt = node.parent;
         }
-        panic!("Key not found in scope: {}", key)
+        Err(Error::KeyNotFound(key))
     }
 
     pub fn get(&self, key: &str) -> Option<Rc<Value>> {

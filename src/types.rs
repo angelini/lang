@@ -1,5 +1,5 @@
 use ast::{Expression, Type, Value};
-use scope::TypeScope;
+use scope::{self, TypeScope};
 use std::collections::HashMap;
 use std::fmt;
 use std::result;
@@ -9,8 +9,15 @@ pub enum Error {
     BindingError(Type, Type),
     CallNonFn(Type),
     PrimitiveFnNotFound(String),
+    ScopeError(scope::Error),
     TypeMismatch(Type, Type),
     UndefinedSymbol(String),
+}
+
+impl From<scope::Error> for Error {
+    fn from(err: scope::Error) -> Error {
+        Error::ScopeError(err)
+    }
 }
 
 pub type Result<T> = result::Result<T, Error>;
@@ -23,6 +30,7 @@ impl fmt::Display for Error {
             }
             Error::CallNonFn(ref typ) => write!(f, "Called a non fn {:?}", typ),
             Error::PrimitiveFnNotFound(ref name) => write!(f, "Primitive fn not found {}", name),
+            Error::ScopeError(ref err) => write!(f, "{}", err),
             Error::TypeMismatch(ref exp, ref act) => {
                 write!(f, "Type mismatch {:?} != {:?}", exp, act)
             }
@@ -39,7 +47,7 @@ fn fn_type(scope: &mut TypeScope,
     scope.descend();
 
     for &(ref name, ref typ) in args {
-        scope.insert(name.clone(), typ.clone());
+        try!(scope.insert(name.clone(), typ.clone()));
         arg_types.push(typ.clone());
     }
 
@@ -47,13 +55,13 @@ fn fn_type(scope: &mut TypeScope,
     for (i, expr) in exprs.iter().enumerate() {
         if i == last {
             let result = try!(type_check(scope, expr));
-            scope.ascend();
+            try!(scope.ascend());
             return Ok((arg_types, result));
         } else {
             try!(type_check(scope, expr));
         }
     }
-    scope.ascend();
+    try!(scope.ascend());
     Ok((arg_types, Type::Nil))
 }
 
@@ -205,25 +213,25 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
             let expr_type = try!(type_check(scope, e));
             let mut bindings = HashMap::new();
 
-            let result = match *hint {
+            let expected = match *hint {
                 Some(ref h) => try!(bind_type(&mut bindings, &expr_type, Some(h))),
                 None => try!(bind_type(&mut bindings, &expr_type, None)),
             };
 
             if local {
-                scope.insert(sym.clone(), result.clone())
+                try!(scope.insert(sym.clone(), expected.clone()))
             } else {
                 match scope.get(sym) {
-                    Some(current_type) => {
-                        if result != current_type {
-                            panic!("Type mistmatch {:?} {:?}", current_type, result)
+                    Some(actual) => {
+                        if expected != actual {
+                            return Err(Error::TypeMismatch(expected, actual));
                         }
                     }
-                    None => panic!("Undefined var: {}", sym),
+                    None => return Err(Error::UndefinedSymbol(sym.to_string())),
                 }
 
             }
-            Ok(result.clone())
+            Ok(expected.clone())
         }
         Expression::Block(ref exprs) => {
             scope.descend();
@@ -231,13 +239,13 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
             for (i, expr) in exprs.into_iter().enumerate() {
                 if i == last {
                     let result = type_check(scope, &expr);
-                    scope.ascend();
+                    try!(scope.ascend());
                     return result;
                 } else {
                     try!(type_check(scope, &expr));
                 }
             }
-            scope.ascend();
+            try!(scope.ascend());
             Ok(Type::Nil)
         }
         Expression::Call(ref sym, ref arg_exprs) => {

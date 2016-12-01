@@ -1,5 +1,5 @@
 use ast::{Type, Value};
-use scope::{TypeScope, ValueScope};
+use scope::{self, TypeScope, ValueScope};
 use std::rc::Rc;
 
 macro_rules! args_to_ref {
@@ -135,7 +135,9 @@ pub fn while_pfn_marker(_: Vec<Rc<Value>>) -> Value {
     unreachable!()
 }
 
-pub fn add_primitive_fns(tscope: &mut TypeScope, vscope: &mut ValueScope) {
+pub fn add_primitive_fns(tscope: &mut TypeScope,
+                         vscope: &mut ValueScope)
+                         -> Result<(), scope::Error> {
     fn type_var(s: &str) -> Type {
         Type::Var(s.to_string())
     }
@@ -167,8 +169,9 @@ pub fn add_primitive_fns(tscope: &mut TypeScope, vscope: &mut ValueScope) {
         ("le", le_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
     ];
     for (symbol, func, types) in primitives {
-        vscope.insert_local(symbol.to_string(),
-                            Rc::new(Value::PrimitiveFn(box (symbol.to_string(), func))));
-        tscope.insert(symbol.to_string(), Type::Fn(box types));
+        try!(vscope.insert_local(symbol.to_string(),
+                                 Rc::new(Value::PrimitiveFn(box (symbol.to_string(), func)))));
+        try!(tscope.insert(symbol.to_string(), Type::Fn(box types)));
     }
+    Ok(())
 }

@@ -105,7 +105,7 @@ impl Env {
         self.types = TypeScope::new();
         self.values = ValueScope::new();
 
-        primitives::add_primitive_fns(&mut self.types, &mut self.values);
+        primitives::add_primitive_fns(&mut self.types, &mut self.values).unwrap();
         for lib in self.stdlibs.iter() {
             eval_file(&mut self.types, &mut self.values, lib).unwrap()
         }
