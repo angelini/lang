@@ -83,7 +83,7 @@ def test_values(p):
         [1, 2, 3]
         (1, "b", true)
         {"a": 2, "bb": 34}
-        fn (a: int, b: str) { print(a, b) }
+        fn (a: int, b: str) { print((a, b)) }
     """)
     assert_type(out[0], 'int')
     assert_type(out[1], 'str')

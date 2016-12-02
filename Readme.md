@@ -41,7 +41,7 @@ if(eq(1, a), {
 })
 
 while(lt(a, 3), {
-  print("a", a)
+  print(("a", a))
   a = add(a, 1)
 })
 
@@ -79,7 +79,7 @@ let map = fn (coll: vec[T], func: (T) -> R) {
     result
 }
 
-let mapped = map([3, 4, 5], fn(v: int) { print("in map", v) add(v, 5) })
+let mapped = map([3, 4, 5], fn(v: int) { print(("in map", v)) add(v, 5) })
 
 let filter = fn (coll: vec[T], func: (T) -> bool) {
     let i = 0
@@ -97,8 +97,8 @@ let filter = fn (coll: vec[T], func: (T) -> bool) {
     result
 }
 
-let filtered = filter(["a", "b", "c"], fn(s: str) { print("in filter", s) eq(s, "b") })
+let filtered = filter(["a", "b", "c"], fn(s: str) { print(("in filter", s)) eq(s, "b") })
 
-print("mapped", mapped)
-print("filtered", filtered)
+print(("mapped", mapped))
+print(("filtered", filtered))
 ```

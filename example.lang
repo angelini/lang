@@ -2,14 +2,14 @@ let foo = 1
 let bar = 2
 
 let list = if(eq(foo, bar), {
-    print("true", foo)
+    print(("true", foo))
     [1, 2]
 }, {
-    print("false", bar)
+    print(("false", bar))
     [3, 4]
 })
 
-print("list", list)
+print(("list", list))
 
 let index = 0
 
@@ -18,7 +18,7 @@ while(lt(index, 10), { # comment
     index = add(index, 1)
 })
 
-print("final i", index)
+print(("final i", index))
 
 let add_two = fn(x: int) {
     add(x, 2)
@@ -26,7 +26,7 @@ let add_two = fn(x: int) {
 
 # other
 
-print("add_two", add_two(4))
+print(("add_two", add_two(4)))
 
 let const = 4
 
@@ -37,11 +37,11 @@ let outer = fn (x: int, y: int) {
     add(x, inner(y, 5))
 }
 
-print("outer", outer(10, 20))
+print(("outer", outer(10, 20)))
 
 const = 5
 
-print("outer", outer(10, 20))
+print(("outer", outer(10, 20)))
 
 let lambda = fn () {
     let closed = 4
@@ -51,6 +51,6 @@ let lambda = fn () {
 }
 
 let lambda_inner = lambda()
-print("closed", lambda_inner())
+print(("closed", lambda_inner()))
 
 1

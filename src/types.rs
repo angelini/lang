@@ -6,6 +6,7 @@ use std::result;
 
 #[derive(Debug)]
 pub enum Error {
+    ArgLength(usize, usize),
     Binding(Type, Type),
     CallNonFn(Type),
     PrimitiveFnNotFound(String),
@@ -25,9 +26,10 @@ pub type Result<T> = result::Result<T, Error>;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::Binding(ref exp, ref act) => {
-                write!(f, "Binding error {:?} != {:?}", exp, act)
+            Error::ArgLength(e, a) => {
+                write!(f, "Argument length error expected: {:?} actual: {:?}", e, a)
             }
+            Error::Binding(ref exp, ref act) => write!(f, "Binding error {:?} != {:?}", exp, act),
             Error::CallNonFn(ref typ) => write!(f, "Called a non fn {:?}", typ),
             Error::PrimitiveFnNotFound(ref name) => write!(f, "Primitive fn not found {}", name),
             Error::Scope(ref err) => write!(f, "{}", err),
@@ -261,6 +263,10 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
             };
             match fn_type {
                 Type::Fn(box (ref arg_types, ref ret_type)) => {
+                    if arg_types.len() != arg_exprs.len() {
+                        return Err(Error::ArgLength(arg_types.len(), arg_exprs.len()));
+                    }
+
                     let mut bindings = HashMap::new();
 
                     for (expr, unbound_type) in arg_exprs.into_iter().zip(arg_types.into_iter()) {

@@ -123,7 +123,14 @@ fn insert(mut args: Vec<Rc<Value>>) -> Value {
 }
 
 fn print_pfn(args: Vec<Rc<Value>>) -> Value {
-    println!("stdout >> {:?}", args);
+    match args_to_ref!(args)[..] {
+        [&Value::Tuple(ref values)] => {
+            println!("stdout >> {}",
+                     values.iter().map(|v| format!("{:?}", v)).collect::<Vec<String>>().join(", "))
+        }
+        [v] => println!("stdout >> {:?}", v),
+        [ref a..] => panic!("Invalid args to print: {:?}", a),
+    }
     Value::Nil
 }
 
@@ -153,14 +160,14 @@ pub fn add_primitive_fns(tscope: &mut TypeScope,
     let primitives: Vec<(&str, PrimitiveFn, PrimitiveFnTypes)> = vec![
         ("if", if_pfn_marker, (vec![Type::Bool, type_var("t"), type_var("t")], type_var("t"))),
         ("while", while_pfn_marker, (vec![Type::Bool, type_var("t")], type_var("t"))),
-        ("add", add, (vec![Type::Int], Type::Int)),
-        ("mget", get, (vec![map_type()], type_var("v"))),
-        ("lget", get, (vec![list_type("t")], type_var("t"))),
-        ("insert", insert, (vec![map_type()], map_type())),
+        ("add", add, (vec![Type::Int, Type::Int], Type::Int)),
+        ("mget", get, (vec![map_type(), type_var("k")], type_var("v"))),
+        ("lget", get, (vec![list_type("t"), Type::Int], type_var("t"))),
+        ("insert", insert, (vec![map_type(), type_var("k"), type_var("v")], map_type())),
         ("keys", keys, (vec![map_type()], list_type("v"))),
         ("msize", size, (vec![map_type()], Type::Int)),
         ("lsize", size, (vec![list_type("t")], Type::Int)),
-        ("push", push, (vec![list_type("t")], list_type("t"))),
+        ("push", push, (vec![list_type("t"), type_var("t")], list_type("t"))),
         ("print", print_pfn, (vec![type_var("t")], Type::Nil)),
         ("eq", eq_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
         ("gt", gt_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
