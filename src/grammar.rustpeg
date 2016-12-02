@@ -10,6 +10,7 @@ expression -> Expression
   / call
   / assign
   / list
+  / tuple
   / map
   / block
   / string_expr
@@ -32,6 +33,9 @@ assign -> Expression
 
 list -> Expression
   = "[" __ e:comma_delim_exprs __ "]" { Expression::List(e) }
+
+tuple -> Expression
+  = "(" __ e:comma_delim_exprs __ ")" { Expression::Tuple(e) }
 
 map -> Expression
   = "{" __ e:comma_delim_expr_pairs __ "}" { Expression::Map(e) }
@@ -83,6 +87,7 @@ type -> Type
   / int_type
   / str_type
   / list_type
+  / tuple_type
   / map_type
   / fn_type
   / var_type
@@ -98,6 +103,9 @@ str_type -> Type
 
 list_type -> Type
   = "list[" __ t:type __ "]" { Type::List(Box::new(t)) }
+
+tuple_type -> Type
+  = "tup[" __ t:comma_delim_types __ "]" { Type::Tuple(t) }
 
 map_type -> Type
   = "map[" __ k:type __ "," __ v:type "]" { Type::Map(Box::new((k, v))) }

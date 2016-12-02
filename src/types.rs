@@ -100,6 +100,12 @@ fn value_to_type(scope: &mut TypeScope, val: &Value) -> Result<Type> {
                 None => Type::List(box Type::Unknown),
             })
         }
+        Value::Tuple(ref values) => {
+            let types = values.iter()
+                .map(|val| value_to_type(scope, val))
+                .collect();
+            Ok(Type::Tuple(try!(types)))
+        }
         Value::Map(ref pairs) => {
             let mut key_exp = None;
             let mut val_exp = None;
@@ -285,6 +291,13 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
             }
             Ok(Type::List(box expected))
         }
+        Expression::Tuple(ref exprs) => {
+            let types = exprs.iter()
+                .map(|expr| type_check(scope, expr))
+                .collect();
+            Ok(Type::Tuple(try!(types)))
+        }
+
         Expression::Map(ref pairs) => {
             if pairs.is_empty() {
                 return Ok(Type::Map(box (Type::Unknown, Type::Unknown)));

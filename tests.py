@@ -81,6 +81,7 @@ def test_values(p):
         true
         nil
         [1, 2, 3]
+        (1, "b", true)
         {"a": 2, "bb": 34}
         fn (a: int, b: str) { print(a, b) }
     """)
@@ -89,8 +90,9 @@ def test_values(p):
     assert_type(out[2], 'bool')
     assert_type(out[3], 'nil')
     assert_type(out[4], 'list(int)')
-    assert_type(out[5], 'map((str, int))')
-    assert_type(out[6], 'fn(([int, str], nil))')
+    assert_type(out[5], 'tuple([int, str, bool])')
+    assert_type(out[6], 'map((str, int))')
+    assert_type(out[7], 'fn(([int, str], nil))')
 
 
 def test_if(p):
