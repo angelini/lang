@@ -82,7 +82,7 @@ type -> Type
   = bool_type
   / int_type
   / str_type
-  / vec_type
+  / list_type
   / map_type
   / fn_type
   / var_type
@@ -96,8 +96,8 @@ int_type -> Type
 str_type -> Type
   = "str" { Type::Str }
 
-vec_type -> Type
-  = "vec[" __ t:type __ "]" { Type::Vec(Box::new(t)) }
+list_type -> Type
+  = "list[" __ t:type __ "]" { Type::List(Box::new(t)) }
 
 map_type -> Type
   = "map[" __ k:type __ "," __ v:type "]" { Type::Map(Box::new((k, v))) }

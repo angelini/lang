@@ -197,7 +197,7 @@ pub fn eval(scope: &mut ValueScope, expr: &Expression) -> Result<Rc<Value>> {
             for expr in exprs.into_iter() {
                 list.push(try!(eval(scope, &expr)))
             }
-            Ok(Rc::new(Value::Vec(list)))
+            Ok(Rc::new(Value::List(list)))
         }
         Expression::Map(ref pairs) => {
             let mut map = BTreeMap::new();

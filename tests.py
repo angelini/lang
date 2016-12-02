@@ -88,7 +88,7 @@ def test_values(p):
     assert_type(out[1], 'str')
     assert_type(out[2], 'bool')
     assert_type(out[3], 'nil')
-    assert_type(out[4], 'vec(int)')
+    assert_type(out[4], 'list(int)')
     assert_type(out[5], 'map((str, int))')
     assert_type(out[6], 'fn(([int, str], nil))')
 
@@ -151,9 +151,9 @@ def test_immutability(p):
         insert(map, "b", 2)
         map
     """)
-    assert_val(out[0], 'vec([int(1), int(2), int(3)])')
-    assert_val(out[1], 'vec([int(1), int(2), int(3), int(4)])')
-    assert_val(out[2], 'vec([int(1), int(2), int(3)])')
+    assert_val(out[0], 'list([int(1), int(2), int(3)])')
+    assert_val(out[1], 'list([int(1), int(2), int(3), int(4)])')
+    assert_val(out[2], 'list([int(1), int(2), int(3)])')
 
     assert_val(out[3], 'map({str("a"): int(1)})')
     assert_val(out[4], 'map({str("a"): int(1), str("b"): int(2)})')

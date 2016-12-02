@@ -80,7 +80,7 @@ fn value_to_type(scope: &mut TypeScope, val: &Value) -> Result<Type> {
         Value::Bool(_) => Ok(Type::Bool),
         Value::Int(_) => Ok(Type::Int),
         Value::Str(_) => Ok(Type::Str),
-        Value::Vec(ref values) => {
+        Value::List(ref values) => {
             let mut expected = None;
             for val in values.iter() {
                 expected = match expected {
@@ -97,7 +97,7 @@ fn value_to_type(scope: &mut TypeScope, val: &Value) -> Result<Type> {
 
             Ok(match expected {
                 Some(typ) => typ,
-                None => Type::Vec(box Type::Unknown),
+                None => Type::List(box Type::Unknown),
             })
         }
         Value::Map(ref pairs) => {
@@ -165,13 +165,13 @@ fn bind_type(bindings: &mut HashMap<String, Type>,
             }
             Ok(bindings.get(name).unwrap().clone())
         }
-        Type::Vec(box ref t) => {
+        Type::List(box ref t) => {
             let expected_t = match expected {
-                Some(&Type::Vec(box ref expected_t)) => Some(expected_t),
+                Some(&Type::List(box ref expected_t)) => Some(expected_t),
                 None => None,
                 _ => return Err(Error::BindingError(expected.unwrap().clone(), unbound.clone())),
             };
-            Ok(Type::Vec(box try!(bind_type(bindings, t, expected_t))))
+            Ok(Type::List(box try!(bind_type(bindings, t, expected_t))))
         }
         Type::Map(box (ref key_t, ref val_t)) => {
             let (expected_key_t, expected_val_t) = match expected {
@@ -271,7 +271,7 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
         }
         Expression::List(ref exprs) => {
             if exprs.is_empty() {
-                return Ok(Type::Vec(box Type::Unknown));
+                return Ok(Type::List(box Type::Unknown));
             }
 
             let first = exprs.get(0).unwrap();
@@ -283,7 +283,7 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
                     return Err(Error::TypeMismatch(expected, actual));
                 }
             }
-            Ok(Type::Vec(box expected))
+            Ok(Type::List(box expected))
         }
         Expression::Map(ref pairs) => {
             if pairs.is_empty() {

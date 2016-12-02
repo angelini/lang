@@ -1,8 +1,8 @@
 let identity = fn(x: T) { x }
 
-let map = fn (coll: vec[T], func: (T) -> R) {
+let map = fn (coll: list[T], func: (T) -> R) {
     let i = 0
-    let result: vec[R] = []
+    let result: list[R] = []
 
     while(lt(i, lsize(coll)), {
         result = push(result, func(lget(coll, i)))
@@ -12,9 +12,9 @@ let map = fn (coll: vec[T], func: (T) -> R) {
     result
 }
 
-let filter = fn (coll: vec[T], func: (T) -> bool) {
+let filter = fn (coll: list[T], func: (T) -> bool) {
     let i = 0
-    let result: vec[T] = []
+    let result: list[T] = []
 
     while(lt(i, lsize(coll)), {
         let item = lget(coll, i)

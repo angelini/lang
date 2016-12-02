@@ -33,30 +33,30 @@ fn eq_pfn(args: Vec<Rc<Value>>) -> Value {
                   Value::Bool,
                   Value::Int,
                   Value::Str,
-                  Value::Vec,
+                  Value::List,
                   Value::Fn,
                   Value::PrimitiveFn)
 }
 
 fn gt_pfn(args: Vec<Rc<Value>>) -> Value {
-    cmp_branches!(greater_than, args, gt, Value::Int, Value::Str, Value::Vec)
+    cmp_branches!(greater_than, args, gt, Value::Int, Value::Str, Value::List)
 }
 
 fn ge_pfn(args: Vec<Rc<Value>>) -> Value {
-    cmp_branches!(greater_equal, args, ge, Value::Int, Value::Str, Value::Vec)
+    cmp_branches!(greater_equal, args, ge, Value::Int, Value::Str, Value::List)
 }
 
 fn lt_pfn(args: Vec<Rc<Value>>) -> Value {
-    cmp_branches!(less_than, args, lt, Value::Int, Value::Str, Value::Vec)
+    cmp_branches!(less_than, args, lt, Value::Int, Value::Str, Value::List)
 }
 
 fn le_pfn(args: Vec<Rc<Value>>) -> Value {
-    cmp_branches!(less_equal, args, le, Value::Int, Value::Str, Value::Vec)
+    cmp_branches!(less_equal, args, le, Value::Int, Value::Str, Value::List)
 }
 
 fn get(args: Vec<Rc<Value>>) -> Value {
     match args_to_ref!(args)[..] {
-        [&Value::Vec(ref l), &Value::Int(i)] => {
+        [&Value::List(ref l), &Value::Int(i)] => {
             match l.get(i as usize) {
                 Some(v) => v.as_ref().clone(),
                 None => Value::Nil,
@@ -74,7 +74,7 @@ fn get(args: Vec<Rc<Value>>) -> Value {
 
 fn size(args: Vec<Rc<Value>>) -> Value {
     match args_to_ref!(args)[..] {
-        [&Value::Vec(ref l)] => Value::Int(l.len() as i64),
+        [&Value::List(ref l)] => Value::Int(l.len() as i64),
         [&Value::Map(ref m)] => Value::Int(m.len() as i64),
         [ref a..] => panic!("Invalid args to size: {:?}", a),
     }
@@ -82,7 +82,7 @@ fn size(args: Vec<Rc<Value>>) -> Value {
 
 fn keys(args: Vec<Rc<Value>>) -> Value {
     match args_to_ref!(args)[..] {
-        [&Value::Map(ref m)] => Value::Vec(m.keys().map(|k| k.clone()).collect::<Vec<Rc<Value>>>()),
+        [&Value::Map(ref m)] => Value::List(m.keys().map(|k| k.clone()).collect::<Vec<Rc<Value>>>()),
         [ref a..] => panic!("Invalid args to len: {:?}", a),
     }
 }
@@ -96,9 +96,9 @@ fn push(mut args: Vec<Rc<Value>>) -> Value {
     };
 
     match (list, val) {
-        (Value::Vec(mut l), v) => {
+        (Value::List(mut l), v) => {
             l.push(v);
-            Value::Vec(l)
+            Value::List(l)
         }
         (l, v) => panic!("Invalid args to push: {:?} {:?}", l, v),
     }
@@ -146,8 +146,8 @@ pub fn add_primitive_fns(tscope: &mut TypeScope,
         Type::Map(box (type_var("k"), type_var("v")))
     }
 
-    fn vec_type(s: &str) -> Type {
-        Type::Vec(box type_var(s))
+    fn list_type(s: &str) -> Type {
+        Type::List(box type_var(s))
     }
 
     let primitives: Vec<(&str, fn(Vec<Rc<Value>>) -> Value, (Vec<Type>, Type))> = vec![
@@ -155,12 +155,12 @@ pub fn add_primitive_fns(tscope: &mut TypeScope,
         ("while", while_pfn_marker, (vec![Type::Bool, type_var("t")], type_var("t"))),
         ("add", add, (vec![Type::Int], Type::Int)),
         ("mget", get, (vec![map_type()], type_var("v"))),
-        ("lget", get, (vec![vec_type("t")], type_var("t"))),
+        ("lget", get, (vec![list_type("t")], type_var("t"))),
         ("insert", insert, (vec![map_type()], map_type())),
-        ("keys", keys, (vec![map_type()], vec_type("v"))),
+        ("keys", keys, (vec![map_type()], list_type("v"))),
         ("msize", size, (vec![map_type()], Type::Int)),
-        ("lsize", size, (vec![vec_type("t")], Type::Int)),
-        ("push", push, (vec![vec_type("t")], vec_type("t"))),
+        ("lsize", size, (vec![list_type("t")], Type::Int)),
+        ("push", push, (vec![list_type("t")], list_type("t"))),
         ("print", print_pfn, (vec![type_var("t")], Type::Nil)),
         ("eq", eq_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
         ("gt", gt_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
