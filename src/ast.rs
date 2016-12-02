@@ -1,6 +1,10 @@
 use std::rc::Rc;
 use std::collections::BTreeMap;
 
+pub type PrimitiveFn = fn(Vec<Rc<Value>>) -> Value;
+pub type PrimitiveFnTypes = (Vec<Type>, Type);
+pub type TypedIdentifier = (String, Type);
+
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Type {
     Unknown,
@@ -22,8 +26,8 @@ pub enum Value {
     Str(String),
     List(Vec<Rc<Value>>),
     Map(BTreeMap<Rc<Value>, Rc<Value>>),
-    Fn(Box<(String, Vec<(String, Type)>, Vec<Expression>)>),
-    PrimitiveFn(Box<(String, fn(Vec<Rc<Value>>) -> Value)>),
+    Fn(Box<(String, Vec<TypedIdentifier>, Vec<Expression>)>),
+    PrimitiveFn(Box<(String, PrimitiveFn)>),
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

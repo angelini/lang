@@ -1,4 +1,6 @@
 #![feature(advanced_slice_patterns, box_patterns, box_syntax, plugin, slice_patterns)]
+
+#![plugin(clippy)]
 #![plugin(peg_syntax_ext)]
 
 extern crate rand;
@@ -71,7 +73,7 @@ fn eval_file(tscope: &mut TypeScope,
     let mut contents = String::new();
     try!(f.read_to_string(&mut contents));
 
-    match grammar::expressions(&contents.trim()) {
+    match grammar::expressions(contents.trim()) {
         Ok(exprs) => {
             for expr in exprs {
                 if !type_check_and_eval(tscope, vscope, expr, false) {
@@ -106,7 +108,7 @@ impl Env {
         self.values = ValueScope::new();
 
         primitives::add_primitive_fns(&mut self.types, &mut self.values).unwrap();
-        for lib in self.stdlibs.iter() {
+        for lib in &self.stdlibs {
             eval_file(&mut self.types, &mut self.values, lib).unwrap()
         }
 
@@ -119,7 +121,7 @@ fn parse_and_eval(env: &mut Env, line: &str, show_line: bool) {
     if show_line {
         println!("lin: {:?}", line);
     }
-    let expr = match grammar::expression(&line) {
+    let expr = match grammar::expression(line) {
         Ok(expr) => expr,
         Err(err) => return println!("parse error: {:?}", err),
     };
@@ -131,7 +133,7 @@ const HISTORY_FILE: &'static str = "history.txt";
 
 fn start_repl(env: &mut Env) {
     let mut rl = Editor::<()>::new();
-    if let Err(_) = rl.load_history(HISTORY_FILE) {
+    if rl.load_history(HISTORY_FILE).is_err() {
         println!("No previous history");
     }
 
@@ -198,7 +200,7 @@ fn main() {
              mem::size_of::<Expression>());
 
     let args = env::args().collect::<Vec<String>>();
-    let mut env = Env::new(&vec!["stdlib.lang"]);
+    let mut env = Env::new(&["stdlib.lang"]);
 
     match args[1..] {
         [] => start_repl(&mut env),

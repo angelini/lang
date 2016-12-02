@@ -1,4 +1,4 @@
-use ast::{Type, Value};
+use ast::{PrimitiveFn, PrimitiveFnTypes, Type, Value};
 use scope::{self, TypeScope, ValueScope};
 use std::rc::Rc;
 
@@ -82,7 +82,7 @@ fn size(args: Vec<Rc<Value>>) -> Value {
 
 fn keys(args: Vec<Rc<Value>>) -> Value {
     match args_to_ref!(args)[..] {
-        [&Value::Map(ref m)] => Value::List(m.keys().map(|k| k.clone()).collect::<Vec<Rc<Value>>>()),
+        [&Value::Map(ref m)] => Value::List(m.keys().cloned().collect::<Vec<Rc<Value>>>()),
         [ref a..] => panic!("Invalid args to len: {:?}", a),
     }
 }
@@ -150,7 +150,7 @@ pub fn add_primitive_fns(tscope: &mut TypeScope,
         Type::List(box type_var(s))
     }
 
-    let primitives: Vec<(&str, fn(Vec<Rc<Value>>) -> Value, (Vec<Type>, Type))> = vec![
+    let primitives: Vec<(&str, PrimitiveFn, PrimitiveFnTypes)> = vec![
         ("if", if_pfn_marker, (vec![Type::Bool, type_var("t"), type_var("t")], type_var("t"))),
         ("while", while_pfn_marker, (vec![Type::Bool, type_var("t")], type_var("t"))),
         ("add", add, (vec![Type::Int], Type::Int)),

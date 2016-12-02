@@ -12,14 +12,14 @@ pub enum Error {
     CallNonFn(String),
     InvalidPredicate(Value),
     InvalidBlock(Expression),
-    ScopeError(scope::Error),
+    Scope(scope::Error),
     UndefinedSymbol(String),
     WrongNumberOfArgs(Vec<String>, Vec<Expression>),
 }
 
 impl From<scope::Error> for Error {
     fn from(err: scope::Error) -> Error {
-        Error::ScopeError(err)
+        Error::Scope(err)
     }
 }
 
@@ -31,7 +31,7 @@ impl fmt::Display for Error {
             Error::CallNonFn(ref val) => write!(f, "Called a non fn {:?}", val),
             Error::InvalidPredicate(ref val) => write!(f, "Invalid predicate {:?}", val),
             Error::InvalidBlock(ref expr) => write!(f, "Invalid block {:?}", expr),
-            Error::ScopeError(ref err) => write!(f, "{}", err),
+            Error::Scope(ref err) => write!(f, "{}", err),
             Error::UndefinedSymbol(ref sym) => write!(f, "Undefined symbol {}", sym),
             Error::WrongNumberOfArgs(ref args, ref actual) => {
                 write!(f, "Wrong number of args {:?} {:?}", args, actual)
@@ -46,7 +46,7 @@ fn call_fn(scope: &mut ValueScope,
            block: &[Expression])
            -> Result<Rc<Value>> {
     let args = args.into_iter()
-        .map(|(name, expr)| (name, eval(scope, &expr)))
+        .map(|(name, expr)| (name, eval(scope, expr)))
         .collect::<Vec<(&str, Result<Rc<Value>>)>>();
 
     let scope_id = scope.descend_from(fn_key);
@@ -57,7 +57,7 @@ fn call_fn(scope: &mut ValueScope,
     let last = block.len() - 1;
     for (i, expr) in block.iter().enumerate() {
         if i == last {
-            let result = eval(scope, &expr);
+            let result = eval(scope, expr);
             try!(scope.ascend());
             scope.jump_to(scope_id);
             return result;
@@ -82,7 +82,7 @@ fn if_pfn(scope: &mut ValueScope, args: &[Expression]) -> Result<Rc<Value>> {
     let pred = try!(eval(scope, &pred));
 
     match *pred {
-        Value::Bool(pred) => if pred { eval(scope, &left) } else { eval(scope, &right) },
+        Value::Bool(pred) => if pred { eval(scope, left) } else { eval(scope, right) },
         ref p => Err(Error::InvalidPredicate(p.clone())),
     }
 }
@@ -158,7 +158,7 @@ pub fn eval(scope: &mut ValueScope, expr: &Expression) -> Result<Rc<Value>> {
             let last = exprs.len() - 1;
             for (i, expr) in exprs.into_iter().enumerate() {
                 if i == last {
-                    let result = eval(scope, &expr);
+                    let result = eval(scope, expr);
                     try!(scope.ascend());
                     return result;
                 } else {
@@ -169,7 +169,7 @@ pub fn eval(scope: &mut ValueScope, expr: &Expression) -> Result<Rc<Value>> {
             Ok(Rc::new(Value::Nil))
         }
         Expression::Call(ref sym, ref arg_exprs) => {
-            let fn_val = match scope.get(&sym) {
+            let fn_val = match scope.get(sym) {
                 Some(val) => val.clone(),
                 None => return Err(Error::UndefinedSymbol(sym.to_string())),
             };
@@ -194,7 +194,7 @@ pub fn eval(scope: &mut ValueScope, expr: &Expression) -> Result<Rc<Value>> {
         }
         Expression::List(ref exprs) => {
             let mut list = Vec::new();
-            for expr in exprs.into_iter() {
+            for expr in exprs {
                 list.push(try!(eval(scope, &expr)))
             }
             Ok(Rc::new(Value::List(list)))
@@ -213,8 +213,8 @@ pub fn eval(scope: &mut ValueScope, expr: &Expression) -> Result<Rc<Value>> {
             Ok(Rc::new(Value::Fn(box (fn_key, args.clone(), exprs.clone()))))
         }
         Expression::Symbol(ref sym) => {
-            if scope.contains_key(&sym) {
-                Ok(scope.get(&sym).unwrap().clone())
+            if scope.contains_key(sym) {
+                Ok(scope.get(sym).unwrap().clone())
             } else {
                 Err(Error::UndefinedSymbol(sym.to_string()))
             }

@@ -157,24 +157,23 @@ impl ValueScope {
             parent = node.parent;
         }
 
-        for &(ref fn_key, ref ids) in to_remove.iter() {
+        for &(ref fn_key, ref ids) in &to_remove {
             for id in ids {
                 let mut remove = false;
                 {
-                    let mut node = self.nodes.get_mut(&id).unwrap();
+                    let mut node = self.nodes.get_mut(id).unwrap();
                     node.deps.remove(fn_key);
                     remove = node.deps.is_empty();
                 }
                 if remove {
-                    self.nodes.remove(&id).unwrap();
+                    self.nodes.remove(id).unwrap();
                 }
             }
         }
 
-        if self.nodes.contains_key(&self.curr_id) {
-            if self.nodes.get(&self.curr_id).unwrap().deps.is_empty() {
-                self.nodes.remove(&self.curr_id);
-            }
+        if self.nodes.contains_key(&self.curr_id) &&
+           self.nodes.get(&self.curr_id).unwrap().deps.is_empty() {
+            self.nodes.remove(&self.curr_id);
         }
 
         self.curr_id = match parent {
@@ -258,7 +257,7 @@ impl ValueScope {
         let mut key_present = HashSet::new();
         let mut has_child = HashSet::new();
 
-        for (id, node) in self.nodes.iter() {
+        for (id, node) in &self.nodes {
             if node.deps.contains(fn_key) {
                 key_present.insert(*id);
                 if let Some(parent) = node.parent {
@@ -269,6 +268,6 @@ impl ValueScope {
 
         let leaf = key_present.difference(&has_child).collect::<Vec<&usize>>();
         assert!(leaf.len() == 1, "More than 1 leaf found");
-        leaf[0].clone()
+        *leaf[0]
     }
 }

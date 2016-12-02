@@ -6,17 +6,17 @@ use std::result;
 
 #[derive(Debug)]
 pub enum Error {
-    BindingError(Type, Type),
+    Binding(Type, Type),
     CallNonFn(Type),
     PrimitiveFnNotFound(String),
-    ScopeError(scope::Error),
+    Scope(scope::Error),
     TypeMismatch(Type, Type),
     UndefinedSymbol(String),
 }
 
 impl From<scope::Error> for Error {
     fn from(err: scope::Error) -> Error {
-        Error::ScopeError(err)
+        Error::Scope(err)
     }
 }
 
@@ -25,12 +25,12 @@ pub type Result<T> = result::Result<T, Error>;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::BindingError(ref exp, ref act) => {
+            Error::Binding(ref exp, ref act) => {
                 write!(f, "Binding error {:?} != {:?}", exp, act)
             }
             Error::CallNonFn(ref typ) => write!(f, "Called a non fn {:?}", typ),
             Error::PrimitiveFnNotFound(ref name) => write!(f, "Primitive fn not found {}", name),
-            Error::ScopeError(ref err) => write!(f, "{}", err),
+            Error::Scope(ref err) => write!(f, "{}", err),
             Error::TypeMismatch(ref exp, ref act) => {
                 write!(f, "Type mismatch {:?} != {:?}", exp, act)
             }
@@ -169,7 +169,7 @@ fn bind_type(bindings: &mut HashMap<String, Type>,
             let expected_t = match expected {
                 Some(&Type::List(box ref expected_t)) => Some(expected_t),
                 None => None,
-                _ => return Err(Error::BindingError(expected.unwrap().clone(), unbound.clone())),
+                _ => return Err(Error::Binding(expected.unwrap().clone(), unbound.clone())),
             };
             Ok(Type::List(box try!(bind_type(bindings, t, expected_t))))
         }
@@ -179,7 +179,7 @@ fn bind_type(bindings: &mut HashMap<String, Type>,
                     (Some(expected_key_t), Some(expected_val_t))
                 }
                 None => (None, None),
-                _ => return Err(Error::BindingError(expected.unwrap().clone(), unbound.clone())),
+                _ => return Err(Error::Binding(expected.unwrap().clone(), unbound.clone())),
             };
             Ok(Type::Map(box (try!(bind_type(bindings, key_t, expected_key_t)),
                               try!(bind_type(bindings, val_t, expected_val_t)))))
@@ -200,7 +200,7 @@ fn bind_type(bindings: &mut HashMap<String, Type>,
                         .collect::<Result<Vec<Type>>>();
                     Ok(Type::Fn(box (try!(bound_args), try!(bind_type(bindings, ret_type, None)))))
                 }
-                _ => return Err(Error::BindingError(expected.unwrap().clone(), unbound.clone())),
+                _ => Err(Error::Binding(expected.unwrap().clone(), unbound.clone())),
             }
         }
         ref unbound => Ok(unbound.clone()),
@@ -238,7 +238,7 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
             let last = exprs.len() - 1;
             for (i, expr) in exprs.into_iter().enumerate() {
                 if i == last {
-                    let result = type_check(scope, &expr);
+                    let result = type_check(scope, expr);
                     try!(scope.ascend());
                     return result;
                 } else {
@@ -249,7 +249,7 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
             Ok(Type::Nil)
         }
         Expression::Call(ref sym, ref arg_exprs) => {
-            let fn_type = match scope.get(&sym) {
+            let fn_type = match scope.get(sym) {
                 Some(typ) => typ,
                 None => return Err(Error::UndefinedSymbol(sym.to_string())),
             };
@@ -279,7 +279,7 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
 
             for expr in exprs.iter().skip(1) {
                 let actual = try!(type_check(scope, &expr));
-                if actual != actual {
+                if expected != actual {
                     return Err(Error::TypeMismatch(expected, actual));
                 }
             }
@@ -312,7 +312,7 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
         }
         Expression::Symbol(ref sym) => {
             if scope.contains_key(sym) {
-                Ok(scope.get(&sym).unwrap())
+                Ok(scope.get(sym).unwrap())
             } else {
                 Err(Error::UndefinedSymbol(sym.to_string()))
             }
