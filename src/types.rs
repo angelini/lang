@@ -181,6 +181,24 @@ fn bind_type(bindings: &mut HashMap<String, Type>,
             };
             Ok(Type::List(box try!(bind_type(bindings, t, expected_t))))
         }
+        Type::Tuple(ref ts) => {
+            match expected {
+                Some(&Type::Tuple(ref expected_ts)) => {
+                    let bound_ts = ts.iter()
+                        .zip(expected_ts.iter())
+                        .map(|(typ, expected)| bind_type(bindings, typ, Some(expected)))
+                        .collect::<Result<Vec<Type>>>();
+                    Ok(Type::Tuple(try!(bound_ts)))
+                }
+                None => {
+                    let bound_ts = ts.iter()
+                        .map(|typ| bind_type(bindings, typ, None))
+                        .collect::<Result<Vec<Type>>>();
+                    Ok(Type::Tuple(try!(bound_ts)))
+                }
+                _ => Err(Error::Binding(expected.unwrap().clone(), unbound.clone())),
+            }
+        }
         Type::Map(box (ref key_t, ref val_t)) => {
             let (expected_key_t, expected_val_t) = match expected {
                 Some(&Type::Map(box (ref expected_key_t, ref expected_val_t))) => {
