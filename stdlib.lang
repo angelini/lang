@@ -27,3 +27,16 @@ let filter = fn (coll: list[T], func: (T) -> bool) {
 
     result
 }
+
+let pairs = fn (coll: map[K, V]) {
+    let i = 0
+    let ks = keys(coll)
+    let result: list[tup[K, V]] = []
+
+    while(lt(i, lsize(ks)), {
+        result = push(result, (lget(ks, i), mget(coll, lget(ks, i))))
+        i = add(i, 1)
+    })
+
+    result
+}
