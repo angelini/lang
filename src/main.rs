@@ -12,7 +12,7 @@ mod primitives;
 mod scope;
 mod types;
 
-use ast::{Expression, Value};
+use ast::{Expression, Type, Value};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use scope::{TypeScope, ValueScope};
@@ -195,9 +195,10 @@ fn eval_stream(env: &mut Env) {
 }
 
 fn main() {
-    println!("mem::size_of::<Value>(): {:?}", mem::size_of::<Value>());
     println!("mem::size_of::<Expression>(): {:?}",
              mem::size_of::<Expression>());
+    println!("mem::size_of::<Type>(): {:?}", mem::size_of::<Type>());
+    println!("mem::size_of::<Value>(): {:?}", mem::size_of::<Value>());
 
     let args = env::args().collect::<Vec<String>>();
     let mut env = Env::new(&["stdlib.lang"]);

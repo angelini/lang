@@ -87,6 +87,17 @@ fn keys(args: Vec<Rc<Value>>) -> Value {
     }
 }
 
+fn pairs(args: Vec<Rc<Value>>) -> Value {
+    match args_to_ref!(args)[..] {
+        [&Value::Map(ref m)] => {
+            Value::List(m.iter()
+                .map(|(k, v)| Rc::new(Value::Tuple(vec![k.clone(), v.clone()])))
+                .collect())
+        }
+        [ref a..] => panic!("Invalid args to pairs: {:?}", a),
+    }
+}
+
 fn push(mut args: Vec<Rc<Value>>) -> Value {
     assert!(args.len() == 2, "Invalid args to push: {:?}", args);
     let val = args.pop().unwrap();
@@ -157,6 +168,10 @@ pub fn add_primitive_fns(tscope: &mut TypeScope,
         Type::List(box type_var(s))
     }
 
+    fn tuple_type(keys: &[&str]) -> Type {
+        Type::Tuple(keys.iter().map(|k| type_var(k)).collect())
+    }
+
     let primitives: Vec<(&str, PrimitiveFn, PrimitiveFnTypes)> = vec![
         ("if", if_pfn_marker, (vec![Type::Bool, type_var("t"), type_var("t")], type_var("t"))),
         ("while", while_pfn_marker, (vec![Type::Bool, type_var("t")], type_var("t"))),
@@ -167,6 +182,7 @@ pub fn add_primitive_fns(tscope: &mut TypeScope,
         ("keys", keys, (vec![map_type()], list_type("v"))),
         ("msize", size, (vec![map_type()], Type::Int)),
         ("lsize", size, (vec![list_type("t")], Type::Int)),
+        ("pairs", pairs, (vec![map_type()], Type::List(box tuple_type(&["k", "v"])))),
         ("push", push, (vec![list_type("t"), type_var("t")], list_type("t"))),
         ("print", print_pfn, (vec![type_var("t")], Type::Nil)),
         ("eq", eq_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
