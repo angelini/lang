@@ -72,6 +72,45 @@ fn get(args: Vec<Rc<Value>>) -> Value {
     }
 }
 
+macro_rules! tuple_get {
+    ( $i:expr, $e:expr ) => {{
+        let fn_name = format!("t{}", $i);
+        match args_to_ref!($e)[..] {
+            [&Value::Tuple(ref t)] => {
+                match t.get($i) {
+                    Some(v) => v.as_ref().clone(),
+                    None => panic!("Invalid args to {}: {:?}", fn_name, Value::Tuple(t.clone())),
+                }
+            }
+            [ref a..] => panic!("Invalid args to {}: {:?}", fn_name, a),
+        }
+    }};
+}
+
+fn t0(args: Vec<Rc<Value>>) -> Value {
+    tuple_get!(0, args)
+}
+
+fn t1(args: Vec<Rc<Value>>) -> Value {
+    tuple_get!(1, args)
+}
+
+fn t2(args: Vec<Rc<Value>>) -> Value {
+    tuple_get!(2, args)
+}
+
+fn t3(args: Vec<Rc<Value>>) -> Value {
+    tuple_get!(3, args)
+}
+
+fn t4(args: Vec<Rc<Value>>) -> Value {
+    tuple_get!(4, args)
+}
+
+fn t5(args: Vec<Rc<Value>>) -> Value {
+    tuple_get!(5, args)
+}
+
 fn size(args: Vec<Rc<Value>>) -> Value {
     match args_to_ref!(args)[..] {
         [&Value::List(ref l)] => Value::Int(l.len() as i64),
@@ -178,6 +217,12 @@ pub fn add_primitive_fns(tscope: &mut TypeScope,
         ("add", add, (vec![Type::Int, Type::Int], Type::Int)),
         ("mget", get, (vec![map_type(), type_var("k")], type_var("v"))),
         ("lget", get, (vec![list_type("t"), Type::Int], type_var("t"))),
+        ("t0", t0, (vec![tuple_type(&["g", "h", "i", "j", "k", "l"])], type_var("g"))),
+        ("t1", t1, (vec![tuple_type(&["g", "h", "i", "j", "k", "l"])], type_var("h"))),
+        ("t2", t2, (vec![tuple_type(&["g", "h", "i", "j", "k", "l"])], type_var("i"))),
+        ("t3", t3, (vec![tuple_type(&["g", "h", "i", "j", "k", "l"])], type_var("j"))),
+        ("t4", t4, (vec![tuple_type(&["g", "h", "i", "j", "k", "l"])], type_var("k"))),
+        ("t5", t5, (vec![tuple_type(&["g", "h", "i", "j", "k", "l"])], type_var("l"))),
         ("insert", insert, (vec![map_type(), type_var("k"), type_var("v")], map_type())),
         ("keys", keys, (vec![map_type()], list_type("v"))),
         ("msize", size, (vec![map_type()], Type::Int)),

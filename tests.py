@@ -173,6 +173,18 @@ def test_generics(p):
     assert_val(out[1], 'int(1)')
 
 
+def test_tuple_getters(p):
+    out = eval_exprs(p, """
+        let t = (0, "a", true)
+        t0(t)
+        t1(t)
+        t2(t)
+    """)
+    assert_val(out[1], 'int(0)')
+    assert_val(out[2], 'str("a")')
+    assert_val(out[3], 'bool(true)')
+
+
 def run_tests(p):
     count = 0
     for test in [test_values,
@@ -180,7 +192,8 @@ def run_tests(p):
                  test_while,
                  test_closures,
                  test_immutability,
-                 test_generics]:
+                 test_generics,
+                 test_tuple_getters]:
         test(p)
         count += 1
         print('.', end='\n' if count % 8 == 0 else '')

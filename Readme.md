@@ -101,4 +101,9 @@ let filtered = filter(["a", "b", "c"], fn(s: str) { print(("in filter", s)) eq(s
 
 print(("mapped", mapped))
 print(("filtered", filtered))
+
+# Increment all values in a map
+
+let inc = map(pairs(hashmap), fn(t: tup[str, int]) { add(1, t1(t)) })
+print(("inc", inc))
 ```
