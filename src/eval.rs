@@ -34,7 +34,10 @@ impl fmt::Display for Error {
             Error::Scope(ref err) => write!(f, "{}", err),
             Error::UndefinedSymbol(ref sym) => write!(f, "Undefined symbol {}", sym),
             Error::WrongNumberOfArgs(ref args, ref actual) => {
-                write!(f, "Wrong number of args {:?} {:?}", args, actual)
+                write!(f,
+                       "Wrong number of args, expected: {:?} actual: {:?}",
+                       args,
+                       actual)
             }
         }
     }
@@ -82,15 +85,20 @@ fn if_pfn(scope: &mut ValueScope, args: &[Expression]) -> Result<Rc<Value>> {
     let pred = try!(eval(scope, &pred));
 
     match *pred {
-        Value::Bool(pred) => if pred { eval(scope, left) } else { eval(scope, right) },
+        Value::Bool(pred) => {
+            if pred {
+                eval(scope, left)
+            } else {
+                eval(scope, right)
+            }
+        }
         ref p => Err(Error::InvalidPredicate(p.clone())),
     }
 }
 
 fn while_pfn(scope: &mut ValueScope, args: &[Expression]) -> Result<Rc<Value>> {
     if args.len() != 2 {
-        return Err(Error::WrongNumberOfArgs(vec!["predicate".to_string(),
-                                                 "block".to_string()],
+        return Err(Error::WrongNumberOfArgs(vec!["predicate".to_string(), "block".to_string()],
                                             args.iter().cloned().collect()));
     }
 

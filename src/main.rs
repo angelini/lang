@@ -40,8 +40,7 @@ fn type_check_and_eval(mut tscope: &mut TypeScope,
             }
         }
         Err(e) => {
-            println!("type error: {}", e);
-            println!("expression: {:?}", expr);
+            println!("err: {}", e);
             return false;
         }
     }
@@ -53,8 +52,7 @@ fn type_check_and_eval(mut tscope: &mut TypeScope,
             }
         }
         Err(e) => {
-            println!("eval error: {}", e);
-            println!("expression: {:?}", expr);
+            println!("err: {}", e);
             return false;
         }
     }

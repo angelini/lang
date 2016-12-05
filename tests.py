@@ -6,11 +6,17 @@ from subprocess import Popen, PIPE
 
 def parse_single_output(block):
     lines = block.split('\n')
-    return {
-        'exp': lines[0][5:],
-        'typ': lines[1][5:],
-        'ret': lines[2][5:],
-    }
+    if lines[1][:3] == 'err':
+        return {
+            'exp': lines[0][5:],
+            'err': lines[1][5:],
+        }
+    else:
+        return {
+            'exp': lines[0][5:],
+            'typ': lines[1][5:],
+            'ret': lines[2][5:],
+        }
 
 
 def parse_output(out):
@@ -70,6 +76,13 @@ def assert_type(out, expected):
 
 def assert_val(out, expected):
     actual = out['ret'].lower()
+    if actual != expected:
+        assert_print(expected, actual)
+
+
+def assert_err(out, expected):
+    actual = out['err'].lower()
+    actual = actual[actual.index('expected:'):]
     if actual != expected:
         assert_print(expected, actual)
 
@@ -185,15 +198,31 @@ def test_tuple_getters(p):
     assert_val(out[3], 'bool(true)')
 
 
+def test_type_error(p):
+    out = eval_exprs(p, """
+        let a = 1
+        a = "a"
+    """)
+    assert_err(out[1], 'expected: int actual: str')
+
+    out = eval_exprs(p, """
+        let l: list[T] = {"a": 1}
+    """)
+    assert_err(out[0], 'expected: list(var("t")) actual: map((str, int))')
+
+
+def test_argument_error(p):
+    out = eval_exprs(p, """
+        let func = fn(x: int) { x }
+        func(1, 2)
+    """)
+    assert_err(out[1], 'expected: 1 actual: 2')
+
+
 def run_tests(p):
     count = 0
-    for test in [test_values,
-                 test_if,
-                 test_while,
-                 test_closures,
-                 test_immutability,
-                 test_generics,
-                 test_tuple_getters]:
+    tests = [v for (k, v) in globals().items() if k.startswith('test_')]
+    for test in tests:
         test(p)
         count += 1
         print('.', end='\n' if count % 8 == 0 else '')

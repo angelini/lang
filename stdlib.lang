@@ -34,7 +34,8 @@ let pairs = fn (coll: map[K, V]) {
     let result: list[tup[K, V]] = []
 
     while(lt(i, lsize(ks)), {
-        result = push(result, (lget(ks, i), mget(coll, lget(ks, i))))
+        let key = lget(ks, i)
+        result = push(result, (key, mget(coll, key)))
         i = add(i, 1)
     })
 

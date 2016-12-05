@@ -26,15 +26,20 @@ pub type Result<T> = result::Result<T, Error>;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::ArgLength(e, a) => {
-                write!(f, "Argument length error expected: {:?} actual: {:?}", e, a)
+            Error::ArgLength(exp, act) => {
+                write!(f,
+                       "Argument length error, expected: {:?} actual: {:?}",
+                       exp,
+                       act)
             }
-            Error::Binding(ref exp, ref act) => write!(f, "Binding error {:?} != {:?}", exp, act),
+            Error::Binding(ref exp, ref act) => {
+                write!(f, "Binding error, expected: {:?} actual: {:?}", exp, act)
+            }
             Error::CallNonFn(ref typ) => write!(f, "Called a non fn {:?}", typ),
             Error::PrimitiveFnNotFound(ref name) => write!(f, "Primitive fn not found {}", name),
             Error::Scope(ref err) => write!(f, "{}", err),
             Error::TypeMismatch(ref exp, ref act) => {
-                write!(f, "Type mismatch {:?} != {:?}", exp, act)
+                write!(f, "Type mismatch, expected: {:?} actual: {:?}", exp, act)
             }
             Error::UndefinedSymbol(ref sym) => write!(f, "Undefined symbol {}", sym),
         }
@@ -239,16 +244,16 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
             let expr_type = try!(type_check(scope, e));
             let mut bindings = HashMap::new();
 
-            let expected = match *hint {
+            let actual = match *hint {
                 Some(ref h) => try!(bind_type(&mut bindings, &expr_type, Some(h))),
                 None => try!(bind_type(&mut bindings, &expr_type, None)),
             };
 
             if local {
-                try!(scope.insert(sym.clone(), expected.clone()))
+                try!(scope.insert(sym.clone(), actual.clone()))
             } else {
                 match scope.get(sym) {
-                    Some(actual) => {
+                    Some(expected) => {
                         if expected != actual {
                             return Err(Error::TypeMismatch(expected, actual));
                         }
@@ -257,7 +262,7 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
                 }
 
             }
-            Ok(expected.clone())
+            Ok(actual.clone())
         }
         Expression::Block(ref exprs) => {
             scope.descend();
