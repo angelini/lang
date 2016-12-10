@@ -64,7 +64,7 @@ def assert_print(expected, actual):
     print(' from:', inspect.stack()[2][3])
     print('')
     print(' expected:', expected)
-    print('      got:', actual)
+    print('   actual:', actual)
     sys.exit(1)
 
 
@@ -217,6 +217,15 @@ def test_argument_error(p):
         func(1, 2)
     """)
     assert_err(out[1], 'expected: 1 actual: 2')
+
+
+def test_bind_unknowns(p):
+    out = eval_exprs(p, """
+        if(true, [1], [])
+        if(true, [], [1])
+    """)
+    assert_type(out[0], 'list(int)')
+    assert_type(out[1], 'list(int)')
 
 
 def run_tests(p):

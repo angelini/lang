@@ -20,7 +20,7 @@ expression -> Expression
   / symbol
 
 call -> Expression
-  = i:identifier "(" __ e:comma_delim_exprs __ ")" { Expression::Call(i, e) }
+  = i:identifier __ "(" __ e:comma_delim_exprs __ ")" { Expression::Call(i, e) }
 
 assign -> Expression
   = l:"let"? __ i:typed_ident __ "=" __ e:expression {

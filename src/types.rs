@@ -176,7 +176,18 @@ fn bind_type(bindings: &mut HashMap<String, Type>,
                     None => bindings.insert(name.to_string(), Type::Var(name.clone())),
                 };
             }
-            Ok(bindings.get(name).unwrap().clone())
+
+            let typ = bindings.get(name).unwrap().clone();
+
+            if let Type::Var(_) = typ {
+                return Ok(typ);
+            }
+
+            let bound = try!(bind_type(bindings, &typ, expected));
+            if bound != typ {
+                bindings.insert(name.to_string(), bound.clone());
+            }
+            Ok(bound)
         }
         Type::List(box ref t) => {
             let expected_t = match expected {
@@ -238,6 +249,39 @@ fn bind_type(bindings: &mut HashMap<String, Type>,
     }
 }
 
+fn is_more_precise(less: &Type, more: &Type) -> bool {
+    if less == more {
+        return true;
+    }
+
+    match (less, more) {
+        (&Type::Unknown, _) => true,
+        (&Type::List(box ref inner_less), &Type::List(box ref inner_more)) => {
+            is_more_precise(inner_less, inner_more)
+        }
+        (&Type::Tuple(ref less_ts), &Type::Tuple(ref more_ts)) => {
+            let mut result = true;
+            for (l, m) in less_ts.iter().zip(more_ts.iter()) {
+                result = result && is_more_precise(l, m);
+            }
+            result
+        }
+        (&Type::Map(box (ref less_key, ref less_val)),
+         &Type::Map(box (ref more_key, ref more_val))) => {
+            is_more_precise(less_key, more_key) && is_more_precise(less_val, more_val)
+        }
+        (&Type::Fn(box (ref less_args, ref less_out)),
+         &Type::Fn(box (ref more_args, ref more_out))) => {
+            let mut result = true;
+            for (l, m) in less_args.iter().zip(more_args.iter()) {
+                result = result && is_more_precise(l, m);
+            }
+            result && is_more_precise(less_out, more_out)
+        }
+        _ => false,
+    }
+}
+
 pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
     match *expr {
         Expression::Assign(box (local, ref sym, ref hint, ref e)) => {
@@ -293,10 +337,10 @@ pub fn type_check(scope: &mut TypeScope, expr: &Expression) -> Result<Type> {
                     let mut bindings = HashMap::new();
 
                     for (expr, unbound_type) in arg_exprs.into_iter().zip(arg_types.into_iter()) {
-                        let expected = try!(type_check(scope, &expr));
-                        let bound = try!(bind_type(&mut bindings, &unbound_type, Some(&expected)));
-                        if bound != expected {
-                            return Err(Error::TypeMismatch(expected, bound));
+                        let unbound = try!(type_check(scope, &expr));
+                        let bound = try!(bind_type(&mut bindings, &unbound_type, Some(&unbound)));
+                        if !is_more_precise(&unbound, &bound) {
+                            return Err(Error::TypeMismatch(bound, unbound))
                         }
                     }
                     bind_type(&mut bindings, ret_type, None)
