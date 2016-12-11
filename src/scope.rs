@@ -76,8 +76,11 @@ impl TypeScope {
 
     pub fn insert(&mut self, key: String, val: Type) -> Result<()> {
         let mut node = self.nodes.get_mut(self.index).unwrap();
-        if node.env.contains_key(&key) {
-            return Err(Error::LocalBindingAlreadyExists(key));
+        match (node.env.get(&key), &val) {
+            (Some(&Type::Unknown), _) |
+            (None, _) => (),
+            (_, &Type::Unknown) => return Ok(()),
+            _ => return Err(Error::LocalBindingAlreadyExists(key)),
         }
         node.env.insert(key, val);
         Ok(())

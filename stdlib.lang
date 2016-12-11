@@ -1,5 +1,21 @@
 let identity = fn(x: T) { x }
 
+let and = fn (left: bool, right: bool) {
+    if(eq(left, true), {
+        if(eq(right, true), true, false)
+    }, {
+        false
+    })
+}
+
+let or = fn (left: bool, right: bool) {
+    if(eq(left, true), {
+        true
+    }, {
+        if(eq(right, true), true, false)
+    })
+}
+
 let map = fn (coll: list[T], func: (T) -> R) {
     let i = 0
     let result: list[R] = []

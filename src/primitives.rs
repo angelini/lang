@@ -15,6 +15,13 @@ fn add(args: Vec<Rc<Value>>) -> Value {
     }
 }
 
+fn sub(args: Vec<Rc<Value>>) -> Value {
+    match args_to_ref!(args)[..] {
+        [&Value::Int(l), &Value::Int(r)] => Value::Int(l - r),
+        [ref a..] => panic!("Invalid args to sub: {:?}", a),
+    }
+}
+
 macro_rules! cmp_branches {
     ( $n:ident, $e:expr, $op:ident, $( $t:path ),* ) => {{
         match args_to_ref!($e)[..] {
@@ -204,6 +211,7 @@ pub fn add_primitive_fns(tscope: &mut TypeScope,
         ("if", if_pfn_marker, (vec![Type::Bool, type_var("t"), type_var("t")], type_var("t"))),
         ("while", while_pfn_marker, (vec![Type::Bool, type_var("t")], type_var("t"))),
         ("add", add, (vec![Type::Int, Type::Int], Type::Int)),
+        ("sub", sub, (vec![Type::Int, Type::Int], Type::Int)),
         ("mget", get, (vec![map_type(), type_var("k")], type_var("v"))),
         ("lget", get, (vec![list_type("t"), Type::Int], type_var("t"))),
         ("t0", t0, (vec![tuple_type(&["g", "h", "i", "j", "k", "l"])], type_var("g"))),

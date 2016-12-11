@@ -106,4 +106,16 @@ print(("filtered", filtered))
 
 let inc = map(pairs(hashmap), fn(t: tup[str, int]) { add(1, t1(t)) })
 print(("inc", inc))
+
+# Recursive functions
+
+let fib = fn (x: int) {
+    if(or(eq(x, 1), eq(x, 2)), {
+        1
+    }, {
+        add(fib(sub(x, 1)), fib(sub(x, 2)))
+    })
+}
+
+print(("fib 10", fib(10)))
 ```

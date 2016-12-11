@@ -228,6 +228,21 @@ def test_bind_unknowns(p):
     assert_type(out[1], 'list(int)')
 
 
+def test_recursion(p):
+    out = eval_exprs(p, """
+        let rec = fn (x: int) {
+            if( eq(x, 1), {
+                1
+            }, {
+                add(rec(sub(x, 1)), 1)
+            })
+        }
+        rec(5)
+    """)
+    assert_type(out[0], 'fn(([int], int))')
+    assert_val(out[1], 'int(5)')
+
+
 def run_tests(p):
     count = 0
     tests = [v for (k, v) in globals().items() if k.startswith('test_')]
