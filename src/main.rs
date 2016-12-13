@@ -1,4 +1,4 @@
-#![feature(advanced_slice_patterns, box_patterns, box_syntax, plugin, slice_patterns)]
+#![feature(box_patterns, box_syntax, plugin, slice_patterns)]
 
 #![plugin(clippy)]
 #![plugin(peg_syntax_ext)]

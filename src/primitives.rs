@@ -3,32 +3,32 @@ use scope::{self, TypeScope, ValueScope};
 use std::rc::Rc;
 
 macro_rules! args_to_ref {
-    ( $a:expr ) => {{
-        $a.iter().map(|a| a.as_ref()).collect::<Vec<&Value>>()
-    }}
+    ( $a:expr, 1 ) => (($a[0].as_ref(),));
+    ( $a:expr, 2 ) => (($a[0].as_ref(), $a[1].as_ref()));
+    ( $a:expr, 3 ) => (($a[0].as_ref(), $a[1].as_ref(), $a[2].as_ref()));
 }
 
 fn add(args: Vec<Rc<Value>>) -> Value {
-    match args_to_ref!(args)[..] {
-        [&Value::Int(l), &Value::Int(r)] => Value::Int(l + r),
-        [ref a..] => panic!("Invalid args to add: {:?}", a),
+    match args_to_ref!(args, 2) {
+        (&Value::Int(l), &Value::Int(r)) => Value::Int(l + r),
+        _ => panic!("Invalid args to add: {:?}", args),
     }
 }
 
 fn sub(args: Vec<Rc<Value>>) -> Value {
-    match args_to_ref!(args)[..] {
-        [&Value::Int(l), &Value::Int(r)] => Value::Int(l - r),
-        [ref a..] => panic!("Invalid args to sub: {:?}", a),
+    match args_to_ref!(args, 2) {
+        (&Value::Int(l), &Value::Int(r)) => Value::Int(l - r),
+        _ => panic!("Invalid args to sub: {:?}", args),
     }
 }
 
 macro_rules! cmp_branches {
-    ( $n:ident, $e:expr, $op:ident, $( $t:path ),* ) => {{
-        match args_to_ref!($e)[..] {
+    ( $n:ident, $a:expr, $op:ident, $( $t:path ),* ) => {{
+        match args_to_ref!($a, 2) {
             $(
-                [&$t(ref l), &$t(ref r)] => Value::Bool(l.$op(r)),
+                (&$t(ref l), &$t(ref r)) => Value::Bool(l.$op(r)),
             )*
-            [ref a..] => panic!("Invalid args to $n: {:?}", a),
+            _ => panic!("Invalid args to $n: {:?}", $a),
         }
     }};
 }
@@ -62,34 +62,34 @@ fn le_pfn(args: Vec<Rc<Value>>) -> Value {
 }
 
 fn get(args: Vec<Rc<Value>>) -> Value {
-    match args_to_ref!(args)[..] {
-        [&Value::List(ref l), &Value::Int(i)] => {
+    match args_to_ref!(args, 2) {
+        (&Value::List(ref l), &Value::Int(i)) => {
             match l.get(i as usize) {
                 Some(v) => v.as_ref().clone(),
                 None => Value::Nil,
             }
         }
-        [&Value::Map(ref m), v] => {
+        (&Value::Map(ref m), v) => {
             match m.get(v) {
                 Some(v) => v.as_ref().clone(),
                 None => Value::Nil,
             }
         }
-        [ref a..] => panic!("Invalid args to get: {:?}", a),
+        _ => panic!("Invalid args to get: {:?}", args),
     }
 }
 
 macro_rules! tuple_get {
-    ( $i:expr, $e:expr ) => {{
+    ( $i:expr, $a:expr ) => {{
         let fn_name = format!("t{}", $i);
-        match args_to_ref!($e)[..] {
-            [&Value::Tuple(ref t)] => {
+        match args_to_ref!($a, 1) {
+            (&Value::Tuple(ref t),) => {
                 match t.get($i) {
                     Some(v) => v.as_ref().clone(),
                     None => panic!("Invalid args to {}: {:?}", fn_name, Value::Tuple(t.clone())),
                 }
             }
-            [ref a..] => panic!("Invalid args to {}: {:?}", fn_name, a),
+            _ => panic!("Invalid args to {}: {:?}", fn_name, $a),
         }
     }};
 }
@@ -119,17 +119,17 @@ fn t5(args: Vec<Rc<Value>>) -> Value {
 }
 
 fn size(args: Vec<Rc<Value>>) -> Value {
-    match args_to_ref!(args)[..] {
-        [&Value::List(ref l)] => Value::Int(l.len() as i64),
-        [&Value::Map(ref m)] => Value::Int(m.len() as i64),
-        [ref a..] => panic!("Invalid args to size: {:?}", a),
+    match args_to_ref!(args, 1) {
+        (&Value::List(ref l),) => Value::Int(l.len() as i64),
+        (&Value::Map(ref m),) => Value::Int(m.len() as i64),
+        _ => panic!("Invalid args to size: {:?}", args),
     }
 }
 
 fn keys(args: Vec<Rc<Value>>) -> Value {
-    match args_to_ref!(args)[..] {
-        [&Value::Map(ref m)] => Value::List(m.keys().cloned().collect::<Vec<Rc<Value>>>()),
-        [ref a..] => panic!("Invalid args to len: {:?}", a),
+    match args_to_ref!(args, 1) {
+        (&Value::Map(ref m),) => Value::List(m.keys().cloned().collect::<Vec<Rc<Value>>>()),
+        _ => panic!("Invalid args to len: {:?}", args),
     }
 }
 
@@ -169,13 +169,12 @@ fn insert(mut args: Vec<Rc<Value>>) -> Value {
 }
 
 fn print_pfn(args: Vec<Rc<Value>>) -> Value {
-    match args_to_ref!(args)[..] {
-        [&Value::Tuple(ref values)] => {
+    match args_to_ref!(args, 1) {
+        (&Value::Tuple(ref values),) => {
             println!("stdout >> {}",
                      values.iter().map(|v| format!("{:?}", v)).collect::<Vec<String>>().join(", "))
         }
-        [v] => println!("stdout >> {:?}", v),
-        [ref a..] => panic!("Invalid args to print: {:?}", a),
+        (v,) => println!("stdout >> {:?}", v),
     }
     Value::Nil
 }

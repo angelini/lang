@@ -118,8 +118,8 @@ fn while_pfn(scope: &mut ValueScope, args: &[Expression]) -> Result<Rc<Value>> {
 
     while pred_bool {
         scope.descend();
-        for expr in exprs.iter().cloned() {
-            result = try!(eval(scope, &expr))
+        for expr in exprs.iter() {
+            result = try!(eval(scope, expr))
         }
         try!(scope.ascend());
 
