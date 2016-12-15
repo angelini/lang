@@ -1,3 +1,4 @@
+use std::fmt;
 use std::rc::Rc;
 use std::collections::BTreeMap;
 
@@ -30,6 +31,31 @@ pub enum Value {
     Map(BTreeMap<Rc<Value>, Rc<Value>>),
     Fn(Box<(String, Vec<TypedIdentifier>, Vec<Expression>)>),
     PrimitiveFn(Box<(String, PrimitiveFn)>),
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Value::Nil => write!(f, "nil"),
+            Value::Bool(v) => write!(f, "{}", if v { "true" } else { "false" }),
+            Value::Int(v) => write!(f, "{}", v.to_string()),
+            Value::Str(ref v) => write!(f, "\"{}\"", v),
+            Value::List(ref v) => {
+                let items = v.iter().map(|i| format!("{}", i)).collect::<Vec<String>>();
+                write!(f, "[{}]", items.join(", "))
+            }
+            Value::Tuple(ref v) => {
+                let items = v.iter().map(|i| format!("{}", i)).collect::<Vec<String>>();
+                write!(f, "({})", items.join(", "))
+            }
+            Value::Map(ref v) => {
+                let items = v.iter().map(|(k, v)| format!("{}: {}", k, v)).collect::<Vec<String>>();
+                write!(f, "{{{}}}", items.join(", "))
+            }
+            Value::Fn(box (ref key, _, _)) => write!(f, "fn<{}>", key),
+            Value::PrimitiveFn(box (ref sym, _)) => write!(f, "primitivefn<{}>", sym),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

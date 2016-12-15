@@ -3,7 +3,7 @@ use scope::{self, TypeScope, ValueScope};
 use std::rc::Rc;
 
 macro_rules! args_to_ref {
-    ( $a:expr, 1 ) => (($a[0].as_ref(),));
+    ( $a:expr, 1 ) => ($a[0].as_ref());
     ( $a:expr, 2 ) => (($a[0].as_ref(), $a[1].as_ref()));
     ( $a:expr, 3 ) => (($a[0].as_ref(), $a[1].as_ref(), $a[2].as_ref()));
 }
@@ -82,8 +82,8 @@ fn get(args: Vec<Rc<Value>>) -> Value {
 macro_rules! tuple_get {
     ( $i:expr, $a:expr ) => {{
         let fn_name = format!("t{}", $i);
-        match args_to_ref!($a, 1) {
-            (&Value::Tuple(ref t),) => {
+        match *args_to_ref!($a, 1) {
+            Value::Tuple(ref t) => {
                 match t.get($i) {
                     Some(v) => v.as_ref().clone(),
                     None => panic!("Invalid args to {}: {:?}", fn_name, Value::Tuple(t.clone())),
@@ -119,16 +119,16 @@ fn t5(args: Vec<Rc<Value>>) -> Value {
 }
 
 fn size(args: Vec<Rc<Value>>) -> Value {
-    match args_to_ref!(args, 1) {
-        (&Value::List(ref l),) => Value::Int(l.len() as i64),
-        (&Value::Map(ref m),) => Value::Int(m.len() as i64),
+    match *args_to_ref!(args, 1) {
+        Value::List(ref l) => Value::Int(l.len() as i64),
+        Value::Map(ref m) => Value::Int(m.len() as i64),
         _ => panic!("Invalid args to size: {:?}", args),
     }
 }
 
 fn keys(args: Vec<Rc<Value>>) -> Value {
-    match args_to_ref!(args, 1) {
-        (&Value::Map(ref m),) => Value::List(m.keys().cloned().collect::<Vec<Rc<Value>>>()),
+    match *args_to_ref!(args, 1) {
+        Value::Map(ref m) => Value::List(m.keys().cloned().collect::<Vec<Rc<Value>>>()),
         _ => panic!("Invalid args to len: {:?}", args),
     }
 }
@@ -169,14 +169,12 @@ fn insert(mut args: Vec<Rc<Value>>) -> Value {
 }
 
 fn print_pfn(args: Vec<Rc<Value>>) -> Value {
-    match args_to_ref!(args, 1) {
-        (&Value::Tuple(ref values),) => {
-            println!("stdout >> {}",
-                     values.iter().map(|v| format!("{:?}", v)).collect::<Vec<String>>().join(", "))
-        }
-        (v,) => println!("stdout >> {:?}", v),
-    }
+    println!("stdout >> {}", args[0]);
     Value::Nil
+}
+
+fn to_string(args: Vec<Rc<Value>>) -> Value {
+    Value::Str(format!("{}", args[0]))
 }
 
 pub fn if_pfn_marker(_: Vec<Rc<Value>>) -> Value {
@@ -225,6 +223,7 @@ pub fn add_primitive_fns(tscope: &mut TypeScope,
         ("lsize", size, (vec![list_type("t")], Type::Int)),
         ("push", push, (vec![list_type("t"), type_var("t")], list_type("t"))),
         ("print", print_pfn, (vec![type_var("t")], Type::Nil)),
+        ("to_string", to_string, (vec![type_var("t")], Type::Str)),
         ("eq", eq_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
         ("gt", gt_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
         ("ge", ge_pfn, (vec![type_var("t"), type_var("t")], Type::Bool)),
